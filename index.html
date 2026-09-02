@@ -11,28 +11,28 @@
 <script src="https://apis.google.com/js/api.js"></script>
 <style>
   :root {
-    --ink: #12192B; --paper: #EEF1F0; --paper-card: #FFFFFF; --paper-line: #DADFE0;
-    --steel: #2C4A73; --steel-soft: #E2E9F1;
+    --ink: #0E1B33; --paper: #EEF2F8; --paper-card: #FFFFFF; --paper-line: #D7E0EC;
+    --steel: #2F5FA8; --steel-soft: #E4ECF9;
     --red: #B23A2E; --red-soft: #F6E4E1;
     --orange: #C97A22; --orange-soft: #F7EBDA;
     --amber: #B9922B; --amber-soft: #F7F0DC;
     --green: #3A7355; --green-soft: #E3EDE6;
     --slate: #6B7280; --slate-soft: #E7E9EB;
-    --text: #12192B; --text-muted: #5B6472;
-    --sidebar-bg: #12192B; --sidebar-text: #C7CEDD; --sidebar-accent: #3E5C8A;
+    --text: #10192B; --text-muted: #55627A;
+    --sidebar-bg: #0E1B33; --sidebar-text: #C3D1E8; --sidebar-accent: #2F5FA8;
   }
   :root:not([data-theme="light"]) {
     @media (prefers-color-scheme: dark) {
-      --paper: #171C24; --paper-card: #1F2530; --paper-line: #333B48;
-      --text: #E7E9EE; --text-muted: #9AA3B2;
-      --steel-soft: #253247; --red-soft: #3A2320; --orange-soft: #3A2C18;
+      --paper: #131A2A; --paper-card: #1B2438; --paper-line: #303C56;
+      --text: #E7ECF7; --text-muted: #9AA8C2;
+      --steel-soft: #22314E; --red-soft: #3A2320; --orange-soft: #3A2C18;
       --amber-soft: #362E17; --green-soft: #1F3327; --slate-soft: #2A2F38;
     }
   }
   :root[data-theme="dark"] {
-    --paper: #171C24; --paper-card: #1F2530; --paper-line: #333B48;
-    --text: #E7E9EE; --text-muted: #9AA3B2;
-    --steel-soft: #253247; --red-soft: #3A2320; --orange-soft: #3A2C18;
+    --paper: #131A2A; --paper-card: #1B2438; --paper-line: #303C56;
+    --text: #E7ECF7; --text-muted: #9AA8C2;
+    --steel-soft: #22314E; --red-soft: #3A2320; --orange-soft: #3A2C18;
     --amber-soft: #362E17; --green-soft: #1F3327; --slate-soft: #2A2F38;
   }
   * { box-sizing: border-box; }
@@ -91,10 +91,37 @@
   .view { display:none; }
   .view.active { display:block; }
 
-  .greeting h1 { font-size:1.4rem; margin:0 0 4px 0; font-weight:600; }
+  .greeting { padding-bottom:4px; }
+  .greeting .kicker { font-size:0.76rem; color:var(--steel); font-weight:600; margin:0 0 6px 0; }
+  .greeting h1 { font-size:1.6rem; margin:0 0 6px 0; font-weight:600; letter-spacing:-0.01em; }
   .greeting p { margin:0; color:var(--text-muted); font-size:0.9rem; max-width:64ch; }
   .section-title { font-size:0.78rem; color:var(--text-muted); margin:28px 0 12px 0; display:flex; align-items:center; gap:8px; }
   .section-title::after { content:""; flex:1; height:1px; background:var(--paper-line); }
+
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+  .panel { background:var(--paper-card); border:1px solid var(--paper-line); border-radius:10px; padding:14px 16px; max-height:230px; overflow-y:auto; }
+  .panel h3 { font-size:0.86rem; margin:0 0 10px 0; font-weight:600; }
+  .panel-sub { font-size:0.72rem; color:var(--text-muted); font-weight:600; margin:12px 0 6px 0; text-transform:none; }
+  .panel-sub:first-child { margin-top:0; }
+  .mini-row { display:flex; justify-content:space-between; gap:10px; padding:6px 0; border-top:1px solid var(--paper-line); font-size:0.82rem; }
+  .mini-row:first-of-type { border-top:none; }
+  .mini-row .r-title { color:var(--text); }
+  .mini-row .r-tag { color:var(--text-muted); font-size:0.74rem; white-space:nowrap; }
+  .panel-empty { font-size:0.8rem; color:var(--text-muted); padding:4px 0; }
+
+  .alert-card { display:flex; gap:11px; background:var(--paper-card); border:1px solid var(--paper-line); border-radius:10px; padding:12px 14px; margin-bottom:8px; align-items:flex-start; }
+  .alert-dot { width:9px; height:9px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+  .alert-dot.critico { background:var(--red); } .alert-dot.urgente { background:var(--orange); }
+  .alert-dot.atencao { background:var(--amber); } .alert-dot.info { background:var(--steel); }
+  .alert-body .a-title { font-weight:600; font-size:0.86rem; }
+  .alert-body .a-msg { font-size:0.81rem; color:var(--text-muted); margin-top:2px; }
+
+  .report-controls { background:var(--paper-card); border:1px solid var(--paper-line); border-radius:10px; padding:18px 20px; margin-bottom:16px; }
+  .report-controls h3 { font-size:0.9rem; margin:0 0 4px 0; }
+  .report-controls .sub { font-size:0.8rem; color:var(--text-muted); margin-bottom:14px; }
+  .report-btns { display:flex; gap:10px; flex-wrap:wrap; }
+  .report-row { display:flex; gap:10px; align-items:center; margin-top:14px; flex-wrap:wrap; }
+  .report-row select { padding:8px 10px; border-radius:8px; border:1px solid var(--paper-line); background:var(--paper); color:var(--text); font-size:0.85rem; flex:1; min-width:220px; }
 
   .priority-list { display:flex; flex-direction:column; gap:10px; }
   .p-card { background:var(--paper-card); border:1px solid var(--paper-line); border-left:3px solid var(--slate); border-radius:10px; padding:14px 16px; display:flex; flex-direction:column; gap:6px; }
@@ -167,6 +194,7 @@
     .deadline-strip { grid-template-columns:repeat(3,1fr); }
     .kanban { grid-template-columns:1fr; }
     .form-grid { grid-template-columns:1fr; }
+    .two-col { grid-template-columns:1fr; }
   }
 </style>
 </head>
@@ -201,6 +229,7 @@
       <button class="nav-item active" data-view="meudia">Meu dia</button>
       <button class="nav-item" data-view="kanban">Quadro Kanban</button>
       <button class="nav-item" data-view="lista">Lista geral<span class="badgecount" id="countTotal">0</span></button>
+      <button class="nav-item" data-view="relatorios">Relatórios</button>
     </nav>
     <div class="sidebar-foot">
       Atividades salvas localmente neste navegador. Login, Agenda de hoje e vínculo de arquivos do Drive vêm da sua conta Google real quando conectada; Gmail, ofícios detalhados e alertas automáticos ainda são etapas seguintes do plano.
@@ -218,11 +247,27 @@
       <!-- MEU DIA -->
       <section class="view active" id="view-meudia">
         <div class="greeting">
-          <h1 class="serif" id="greetingText">Bom dia. Aqui estão suas atividades priorizadas.</h1>
-          <p>Prioridade calculada a partir de prazo, situação e tempo sem movimentação de cada atividade cadastrada. Você pode sobrescrever a classificação a qualquer momento.</p>
+          <div class="kicker" id="dataExtenso"></div>
+          <h1 class="serif" id="greetingText">Bom dia. Estas são as atividades que iremos priorizar hoje.</h1>
         </div>
-        <div class="section-title">Agenda de hoje (Google Calendar)</div>
-        <div id="agendaBox" class="empty-state">Conecte sua conta Google para trazer os compromissos de hoje aqui.</div>
+
+        <div class="section-title">Central de alertas</div>
+        <div id="centralAlertas"></div>
+
+        <div class="section-title">Agenda e acompanhamento</div>
+        <div class="two-col">
+          <div class="panel">
+            <h3>Agenda Google</h3>
+            <div id="agendaBox" class="panel-empty">Conecte sua conta Google para trazer seus próximos compromissos aqui.</div>
+          </div>
+          <div class="panel">
+            <h3>Acompanhamento</h3>
+            <div class="panel-sub">Ofícios aguardando resposta</div>
+            <div id="acompOficios"></div>
+            <div class="panel-sub">Sem movimentação há vários dias</div>
+            <div id="acompParados"></div>
+          </div>
+        </div>
 
         <div class="section-title">Prioridades de hoje</div>
         <div class="priority-list" id="priorityList"></div>
@@ -248,6 +293,28 @@
         <div id="listWrap"></div>
       </section>
 
+      <!-- RELATÓRIOS -->
+      <section class="view" id="view-relatorios">
+        <div class="section-title">Relatórios</div>
+        <div class="report-controls">
+          <h3>Movimentações por período</h3>
+          <div class="sub">Baixa um arquivo .csv (abre e edita normalmente no Excel/Google Planilhas) com as atividades criadas ou atualizadas no período, incluindo o histórico de alterações de cada uma.</div>
+          <div class="report-btns">
+            <button class="btn btn-primary" id="rep30">Últimos 30 dias</button>
+            <button class="btn btn-primary" id="rep60">Últimos 60 dias</button>
+            <button class="btn btn-primary" id="rep90">Últimos 90 dias</button>
+          </div>
+        </div>
+        <div class="report-controls">
+          <h3>Relatório de uma atividade específica</h3>
+          <div class="sub">Escolha uma atividade para baixar todos os seus dados e histórico completo de movimentações.</div>
+          <div class="report-row">
+            <select id="repAtividadeSelect"></select>
+            <button class="btn btn-primary" id="repAtividadeBtn">Baixar relatório desta atividade</button>
+          </div>
+        </div>
+      </section>
+
     </div>
   </main>
 </div>
@@ -267,6 +334,9 @@
         <div class="field"><label>Situação *</label><select id="f_situacao" required></select></div>
         <div class="field"><label>Número do processo</label><input type="text" id="f_processo"></div>
         <div class="field"><label>Número do ofício</label><input type="text" id="f_oficio"></div>
+        <div class="field full"><label>Este ofício é resposta a outro já cadastrado? (opcional)</label>
+          <select id="f_resposta_oficio"><option value="">Não é resposta / não se aplica</option></select>
+        </div>
         <div class="field"><label>Empresa / Interessado</label><input type="text" id="f_interessado"></div>
         <div class="field"><label>Unidade / Setor</label><input type="text" id="f_unidade"></div>
         <div class="field"><label>Responsável</label><input type="text" id="f_responsavel"></div>
@@ -312,10 +382,21 @@
    ====================================================================== */
 const GOOGLE_CLIENT_ID = "168552508927-4474arbuqhhef9iaps6n67rr63saeslo.apps.googleusercontent.com";
 const GOOGLE_API_KEY = "SUA_API_KEY_AQUI";
-const GOOGLE_SCOPES = "email profile https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/drive.file";
+const GOOGLE_SCOPES = "email profile https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/gmail.readonly";
 let pickerInited = false;
 let googleAccessToken = null;
 let googleProfile = null;
+let emailsTrabalho = [];
+
+/* Palavras-chave usadas para sinalizar e-mails como possivelmente relacionados ao
+   trabalho — isto é um filtro simples por texto, não uma classificação por IA.
+   Ajuste esta lista livremente. */
+const PALAVRAS_TRABALHO = [
+  "ofício","oficio","processo","licitação","licitacao","licitatório","pregão","pregao",
+  "reequilíbrio","reequilibrio","contrato","ipm","parecer","edital","prazo","aeronáutica",
+  "aeronautica","gap-rf","gap rf","harf","oarf","cindacta","nup","intimação","intimacao",
+  "petição","peticao","processo administrativo","recurso","citação","citacao","oab"
+];
 /* ====================================================================== */
 
 const CATEGORIAS = ["Reequilíbrio econômico-financeiro","Ofício","Licitação","IPM","Processo administrativo","Reunião","E-mail","Tratativa","Demanda interna","Demanda externa","Outros"];
@@ -412,10 +493,22 @@ function fmtData(iso){
   return `${d}/${m}/${y}`;
 }
 
+function saudacaoPorTurno(){
+  const h = new Date().getHours();
+  if (h < 12) return 'Bom dia';
+  if (h < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+function dataPorExtenso(){
+  return new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
 /* ---------- RENDER: MEU DIA ---------- */
 function renderMeuDia(){
   const nome = (loadPerfil()||{}).nome || "Lincoln";
-  document.getElementById('greetingText').textContent = `Bom dia, ${nome}. Estas são as atividades que recomendo priorizar hoje.`;
+  document.getElementById('greetingText').textContent = `${saudacaoPorTurno()}, ${nome}. Estas são as atividades que iremos priorizar hoje.`;
+  const dataEl = document.getElementById('dataExtenso');
+  if (dataEl) dataEl.textContent = dataPorExtenso();
 
   const withPrio = atividades
     .filter(a => !["Concluído","Arquivado","Respondido"].includes(a.situacao))
@@ -436,7 +529,7 @@ function renderMeuDia(){
           <div class="badges"><span class="badge ${badgeClass(p.nivel)}">${p.nivel}</span><span class="badge">${a.categoria}</span></div>
         </div>
         <div class="p-justif">${p.justificativa}</div>
-        <div class="p-meta">${a.processo ? 'Processo '+escapeHtml(a.processo)+' · ' : ''}${a.prazo_oficial ? 'Prazo: '+fmtData(a.prazo_oficial) : 'Sem prazo cadastrado'}</div>
+        <div class="p-meta">${a.processo ? 'Processo '+escapeHtml(a.processo)+' · ' : ''}${a.prazo_oficial ? 'Prazo: '+fmtData(a.prazo_oficial) : 'Sem prazo cadastrado'}${a.resposta_oficio_id ? ' · Resposta ao ofício: '+escapeHtml((atividades.find(x=>x.id===a.resposta_oficio_id)||{}).titulo||'') : ''}</div>
       </div>
     `).join('');
   }
@@ -460,6 +553,61 @@ function renderMeuDia(){
     <div class="dl-chip"><div class="n">${buckets.d15}</div><div class="l">15 dias</div></div>
     <div class="dl-chip"><div class="n">${buckets.d30}</div><div class="l">30 dias</div></div>
   `;
+
+  renderAcompanhamento();
+  renderCentralAlertas();
+}
+
+function renderAcompanhamento(){
+  const oficiosAguardando = atividades.filter(a => a.categoria === 'Ofício' && a.situacao === 'Aguardando resposta');
+  const elOf = document.getElementById('acompOficios');
+  elOf.innerHTML = oficiosAguardando.length === 0
+    ? '<div class="panel-empty">Nenhum ofício aguardando resposta.</div>'
+    : oficiosAguardando.map(a => {
+        const dp = diffDias(a.prazo_oficial || a.prazo_interno);
+        const tag = dp === null ? 'Sem prazo' : (dp < 0 ? `Vencido há ${Math.abs(dp)}d` : `Vence em ${dp}d`);
+        return `<div class="mini-row"><span class="r-title">${escapeHtml(a.titulo)}</span><span class="r-tag">${tag}</span></div>`;
+      }).join('');
+
+  const parados = atividades
+    .filter(a => !["Concluído","Arquivado","Respondido"].includes(a.situacao))
+    .map(a => ({ a, dias: a.atualizado_em ? Math.round((new Date(todayISO()) - new Date(a.atualizado_em)) / 86400000) : 0 }))
+    .filter(x => x.dias >= 7)
+    .sort((x,y) => y.dias - x.dias);
+  const elParados = document.getElementById('acompParados');
+  elParados.innerHTML = parados.length === 0
+    ? '<div class="panel-empty">Nada parado há mais de 7 dias.</div>'
+    : parados.map(({a,dias}) => `<div class="mini-row"><span class="r-title">${escapeHtml(a.titulo)}</span><span class="r-tag">${dias} dias parado</span></div>`).join('');
+}
+
+function renderCentralAlertas(){
+  const alertas = [];
+  atividades.forEach(a => {
+    if (["Concluído","Arquivado","Respondido"].includes(a.situacao)) return;
+    const dp = diffDias(a.prazo_oficial || a.prazo_interno);
+    if (dp !== null && dp < 0) {
+      alertas.push({ nivel:'critico', titulo: `Prazo vencido — ${a.titulo}`, msg: `Venceu há ${Math.abs(dp)} dia(s).` });
+    } else if (dp !== null && dp === 0) {
+      alertas.push({ nivel:'urgente', titulo: `Prazo vence hoje — ${a.titulo}`, msg: 'Verificar e concluir hoje, se possível.' });
+    }
+  });
+  emailsTrabalho.forEach(e => {
+    alertas.push({ nivel:'info', titulo: `Possível e-mail de trabalho: ${e.assunto}`, msg: `De: ${e.de} · sinalizado por palavra-chave, confira antes de agir.` });
+  });
+
+  const el = document.getElementById('centralAlertas');
+  if (alertas.length === 0) {
+    el.innerHTML = '<div class="panel-empty">Sem alertas no momento.</div>';
+    return;
+  }
+  const ordem = { critico:0, urgente:1, atencao:2, info:3 };
+  alertas.sort((x,y) => ordem[x.nivel]-ordem[y.nivel]);
+  el.innerHTML = alertas.slice(0,8).map(al => `
+    <div class="alert-card">
+      <span class="alert-dot ${al.nivel}"></span>
+      <div class="alert-body"><div class="a-title">${escapeHtml(al.titulo)}</div><div class="a-msg">${escapeHtml(al.msg)}</div></div>
+    </div>
+  `).join('');
 }
 
 /* ---------- RENDER: KANBAN ---------- */
@@ -521,20 +669,32 @@ function renderLista(){
 function escapeHtml(s){ return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 function renderAll(){
-  renderMeuDia(); renderKanban(); renderLista();
+  renderMeuDia(); renderKanban(); renderLista(); renderSelectRelatorio();
   document.getElementById('countTotal').textContent = atividades.length;
 }
 
+function renderSelectRelatorio(){
+  const sel = document.getElementById('repAtividadeSelect');
+  if (!sel) return;
+  const atual = sel.value;
+  sel.innerHTML = atividades.map(a => `<option value="${a.id}">${escapeHtml(a.titulo)}</option>`).join('');
+  if (atual && atividades.some(a => a.id === atual)) sel.value = atual;
+}
+
 /* ---------- MODAL ---------- */
-function popularSelects(){
+function popularSelects(idExcluir){
   const cSel = document.getElementById('f_categoria');
   const sSel = document.getElementById('f_situacao');
   if (cSel.options.length === 0) CATEGORIAS.forEach(c => cSel.innerHTML += `<option>${c}</option>`);
   if (sSel.options.length === 0) SITUACOES.forEach(s => sSel.innerHTML += `<option>${s}</option>`);
+  const rSel = document.getElementById('f_resposta_oficio');
+  const oficios = atividades.filter(a => a.categoria === 'Ofício' && a.id !== idExcluir);
+  rSel.innerHTML = '<option value="">Não é resposta / não se aplica</option>' +
+    oficios.map(a => `<option value="${a.id}">${escapeHtml(a.titulo)}${a.oficio ? ' (nº '+escapeHtml(a.oficio)+')' : ''}</option>`).join('');
 }
 function abrirNovo(){
   currentEdit = null;
-  popularSelects();
+  popularSelects(null);
   document.getElementById('modalTitle').textContent = 'Cadastrar atividade';
   document.getElementById('atividadeForm').reset();
   document.getElementById('f_id').value = '';
@@ -547,7 +707,7 @@ function abrirEdicao(id){
   const a = atividades.find(x => x.id === id);
   if (!a) return;
   currentEdit = a;
-  popularSelects();
+  popularSelects(a.id);
   document.getElementById('modalTitle').textContent = 'Editar atividade';
   document.getElementById('f_id').value = a.id;
   document.getElementById('f_titulo').value = a.titulo || '';
@@ -556,6 +716,7 @@ function abrirEdicao(id){
   document.getElementById('f_situacao').value = a.situacao || '';
   document.getElementById('f_processo').value = a.processo || '';
   document.getElementById('f_oficio').value = a.oficio || '';
+  document.getElementById('f_resposta_oficio').value = a.resposta_oficio_id || '';
   document.getElementById('f_interessado').value = a.interessado || '';
   document.getElementById('f_unidade').value = a.unidade || '';
   document.getElementById('f_responsavel').value = a.responsavel || '';
@@ -615,6 +776,7 @@ document.getElementById('atividadeForm').addEventListener('submit', function(e){
     situacao: situacao,
     processo: document.getElementById('f_processo').value.trim(),
     oficio: document.getElementById('f_oficio').value.trim(),
+    resposta_oficio_id: document.getElementById('f_resposta_oficio').value,
     interessado: document.getElementById('f_interessado').value.trim(),
     unidade: document.getElementById('f_unidade').value.trim(),
     responsavel: document.getElementById('f_responsavel').value.trim(),
@@ -704,6 +866,69 @@ function pickerCallback(data){
   }
 }
 
+/* ---------- RELATÓRIOS ---------- */
+function csvEscape(v){
+  const s = (v === null || v === undefined) ? '' : String(v);
+  if (/[",\n;]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+function baixarArquivo(nome, conteudo, tipo){
+  try {
+    const blob = new Blob([conteudo], { type: tipo });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = nome;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  } catch (e) {
+    alert('Não foi possível gerar o arquivo: ' + e.message);
+  }
+}
+
+function gerarRelatorioPeriodo(dias){
+  const limite = new Date(); limite.setDate(limite.getDate() - dias);
+  const linhas = [['Título','Categoria','Situação','Processo','Ofício','Prazo oficial','% Conclusão','Criado em','Atualizado em','Campo alterado','De','Para','Data da alteração']];
+  atividades.forEach(a => {
+    const dentroDoPeriodo = (a.atualizado_em && new Date(a.atualizado_em) >= limite) || (a.criado_em && new Date(a.criado_em) >= limite);
+    const hist = (a.historico || []).filter(h => h.quando && new Date(h.quando) >= limite);
+    if (!dentroDoPeriodo && hist.length === 0) return;
+    if (hist.length === 0) {
+      linhas.push([a.titulo, a.categoria, a.situacao, a.processo, a.oficio, a.prazo_oficial, a.percentual, a.criado_em, a.atualizado_em, '', '', '', '']);
+    } else {
+      hist.forEach(h => {
+        linhas.push([a.titulo, a.categoria, a.situacao, a.processo, a.oficio, a.prazo_oficial, a.percentual, a.criado_em, a.atualizado_em, h.campo, h.de, h.para, h.quando]);
+      });
+    }
+  });
+  const csv = linhas.map(l => l.map(csvEscape).join(';')).join('\n');
+  baixarArquivo(`relatorio-${dias}-dias-${todayISO()}.csv`, csv, 'text/csv;charset=utf-8;');
+}
+
+function gerarRelatorioAtividade(id){
+  const a = atividades.find(x => x.id === id);
+  if (!a) { alert('Selecione uma atividade.'); return; }
+  const linhas = [['Campo','Valor']];
+  Object.entries({
+    'Título': a.titulo, 'Descrição': a.descricao, 'Categoria': a.categoria, 'Situação': a.situacao,
+    'Processo': a.processo, 'Ofício': a.oficio, 'Resposta ao ofício': (atividades.find(x=>x.id===a.resposta_oficio_id)||{}).titulo || '',
+    'Interessado/Empresa': a.interessado, 'Unidade': a.unidade, 'Responsável': a.responsavel,
+    'Prazo oficial': a.prazo_oficial, 'Prazo interno': a.prazo_interno, '% Conclusão': a.percentual,
+    'Link do Drive': a.drive, 'Próxima providência': a.proxima, 'Dependência': a.dependencia,
+    'Observações': a.observacoes, 'Criado em': a.criado_em, 'Atualizado em': a.atualizado_em
+  }).forEach(([k,v]) => linhas.push([k, v]));
+  linhas.push(['', '']);
+  linhas.push(['Histórico', '']);
+  linhas.push(['Data', 'Campo', 'De', 'Para']);
+  (a.historico || []).forEach(h => linhas.push([h.quando, h.campo, h.de, h.para]));
+  const csv = linhas.map(l => l.map(csvEscape).join(';')).join('\n');
+  baixarArquivo(`relatorio-atividade-${(a.titulo||'sem-titulo').slice(0,40).replace(/[^\w\-]+/g,'_')}.csv`, csv, 'text/csv;charset=utf-8;');
+}
+
+document.getElementById('rep30').addEventListener('click', () => gerarRelatorioPeriodo(30));
+document.getElementById('rep60').addEventListener('click', () => gerarRelatorioPeriodo(60));
+document.getElementById('rep90').addEventListener('click', () => gerarRelatorioPeriodo(90));
+document.getElementById('repAtividadeBtn').addEventListener('click', () => gerarRelatorioAtividade(document.getElementById('repAtividadeSelect').value));
+
 /* ---------- ONBOARDING ---------- */
 function entrar(nome, viaGoogle){
   savePerfil({ nome: nome || 'Lincoln', viaGoogle: !!viaGoogle });
@@ -712,7 +937,7 @@ function entrar(nome, viaGoogle){
   document.getElementById('onboarding').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   load(); renderAll();
-  if (viaGoogle) buscarAgendaDeHoje();
+  if (viaGoogle) { buscarAgendaGoogle(); buscarEmailsTrabalho(); }
 }
 
 document.getElementById('showFallback').addEventListener('click', () => {
@@ -758,21 +983,21 @@ document.getElementById('googleBtn').addEventListener('click', () => {
   }
 });
 
-async function buscarAgendaDeHoje(){
+async function buscarAgendaGoogle(){
   const box = document.getElementById('agendaBox');
   if (!googleAccessToken) {
-    box.className = 'empty-state';
-    box.textContent = 'Conecte sua conta Google para trazer os compromissos de hoje aqui.';
+    box.className = 'panel-empty';
+    box.textContent = 'Conecte sua conta Google para trazer seus próximos compromissos aqui.';
     return;
   }
-  box.className = 'empty-state';
-  box.textContent = 'Buscando compromissos de hoje na sua Google Agenda...';
+  box.className = 'panel-empty';
+  box.textContent = 'Buscando compromissos dos próximos 7 dias...';
   try {
-    const inicio = new Date(); inicio.setHours(0,0,0,0);
-    const fim = new Date(); fim.setHours(23,59,59,999);
+    const inicio = new Date();
+    const fim = new Date(); fim.setDate(fim.getDate() + 7); fim.setHours(23,59,59,999);
     const params = new URLSearchParams({
       timeMin: inicio.toISOString(), timeMax: fim.toISOString(),
-      singleEvents: 'true', orderBy: 'startTime'
+      singleEvents: 'true', orderBy: 'startTime', maxResults: '20'
     });
     const r = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?' + params.toString(), {
       headers: { Authorization: 'Bearer ' + googleAccessToken }
@@ -781,16 +1006,49 @@ async function buscarAgendaDeHoje(){
     const data = await r.json();
     const eventos = data.items || [];
     if (eventos.length === 0) {
-      box.textContent = 'Nenhum compromisso encontrado na sua Google Agenda para hoje.';
+      box.textContent = 'Nenhum compromisso encontrado nos próximos 7 dias.';
       return;
     }
     box.className = '';
     box.innerHTML = eventos.map(ev => {
-      const inicioEv = ev.start.dateTime ? new Date(ev.start.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : 'Dia inteiro';
-      return `<div class="mini-list" style="margin-bottom:8px;"><div class="mini-row" style="border-top:none;"><span class="r-title">${inicioEv} — ${escapeHtml(ev.summary || '(sem título)')}</span><span class="r-tag">${ev.location ? escapeHtml(ev.location) : ''}</span></div></div>`;
+      const dt = ev.start.dateTime ? new Date(ev.start.dateTime) : new Date(ev.start.date + 'T00:00:00');
+      const dataFmt = dt.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
+      const horaFmt = ev.start.dateTime ? dt.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : 'Dia inteiro';
+      return `<div class="mini-row"><span class="r-title">${dataFmt} · ${horaFmt} — ${escapeHtml(ev.summary || '(sem título)')}</span><span class="r-tag">${ev.location ? escapeHtml(ev.location) : ''}</span></div>`;
     }).join('');
   } catch (e) {
     box.textContent = 'Não foi possível buscar a agenda agora (' + e.message + '). O token de acesso do Google expira após um tempo — talvez seja necessário entrar novamente.';
+  }
+}
+
+async function buscarEmailsTrabalho(){
+  if (!googleAccessToken) return;
+  try {
+    const listR = await fetch('https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=20&q=' + encodeURIComponent('newer_than:7d'), {
+      headers: { Authorization: 'Bearer ' + googleAccessToken }
+    });
+    if (!listR.ok) throw new Error('HTTP ' + listR.status);
+    const listData = await listR.json();
+    const ids = (listData.messages || []).map(m => m.id);
+    const encontrados = [];
+    for (const id of ids) {
+      const mr = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From`, {
+        headers: { Authorization: 'Bearer ' + googleAccessToken }
+      });
+      if (!mr.ok) continue;
+      const msg = await mr.json();
+      const headers = (msg.payload && msg.payload.headers) || [];
+      const assunto = (headers.find(h => h.name === 'Subject') || {}).value || '(sem assunto)';
+      const de = (headers.find(h => h.name === 'From') || {}).value || '';
+      const textoBusca = (assunto + ' ' + (msg.snippet || '')).toLowerCase();
+      if (PALAVRAS_TRABALHO.some(p => textoBusca.includes(p))) {
+        encontrados.push({ id, assunto, de, snippet: msg.snippet || '' });
+      }
+    }
+    emailsTrabalho = encontrados;
+    renderCentralAlertas();
+  } catch (e) {
+    console.error('Falha ao buscar e-mails do Gmail:', e.message);
   }
 }
 
