@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://apis.google.com/js/api.js"></script>
 <style>
   :root {
     --ink: #12192B; --paper: #EEF1F0; --paper-card: #FFFFFF; --paper-line: #DADFE0;
@@ -202,7 +203,7 @@
       <button class="nav-item" data-view="lista">Lista geral<span class="badgecount" id="countTotal">0</span></button>
     </nav>
     <div class="sidebar-foot">
-      Atividades salvas localmente neste navegador. Login e Agenda de hoje vêm da sua conta Google real quando conectada; Drive, Gmail, ofícios detalhados e alertas automáticos ainda são etapas seguintes do plano.
+      Atividades salvas localmente neste navegador. Login, Agenda de hoje e vínculo de arquivos do Drive vêm da sua conta Google real quando conectada; Gmail, ofícios detalhados e alertas automáticos ainda são etapas seguintes do plano.
       <button id="resetData">Limpar todos os dados</button>
     </div>
   </aside>
@@ -275,7 +276,12 @@
         <div class="field"><label>Prazo oficial</label><input type="date" id="f_prazo_oficial"></div>
         <div class="field"><label>Prazo interno</label><input type="date" id="f_prazo_interno"></div>
         <div class="field"><label>Percentual de conclusão</label><input type="number" min="0" max="100" id="f_percentual"></div>
-        <div class="field"><label>Link da pasta/documento no Drive</label><input type="text" id="f_drive" placeholder="Cole o link aqui"></div>
+        <div class="field full"><label>Link da pasta/documento no Drive</label>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="f_drive" placeholder="Cole o link aqui ou escolha no Drive" style="flex:1;">
+            <button type="button" class="btn" id="pickDriveBtn">Escolher no Drive</button>
+          </div>
+        </div>
         <div class="field full"><label>Próxima providência</label><input type="text" id="f_proxima"></div>
         <div class="field full"><label>Dependência / impedimento</label><input type="text" id="f_dependencia"></div>
         <div class="field full"><label>Observações</label><textarea id="f_observacoes"></textarea></div>
@@ -305,7 +311,9 @@
    (veja o passo a passo de criação em console.cloud.google.com)
    ====================================================================== */
 const GOOGLE_CLIENT_ID = "168552508927-4474arbuqhhef9iaps6n67rr63saeslo.apps.googleusercontent.com";
-const GOOGLE_SCOPES = "email profile https://www.googleapis.com/auth/calendar.readonly";
+const GOOGLE_API_KEY = "SUA_API_KEY_AQUI";
+const GOOGLE_SCOPES = "email profile https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/drive.file";
+let pickerInited = false;
 let googleAccessToken = null;
 let googleProfile = null;
 /* ====================================================================== */
@@ -650,6 +658,51 @@ document.getElementById('resetData').addEventListener('click', () => {
   if (!confirm('Isso apaga todas as atividades salvas neste navegador. Continuar?')) return;
   atividades = seedExemplos(); save(); renderAll();
 });
+
+document.getElementById('pickDriveBtn').addEventListener('click', abrirPickerDrive);
+
+function loadPicker(cb){
+  if (typeof gapi === 'undefined') {
+    alert('A biblioteca do Google Picker não carregou (apis.google.com). Verifique sua conexão com a internet.');
+    return;
+  }
+  if (pickerInited) { cb(); return; }
+  gapi.load('picker', () => { pickerInited = true; cb(); });
+}
+
+function abrirPickerDrive(){
+  if (!googleAccessToken) {
+    alert('Faça login com sua conta Google (na tela inicial) antes de vincular um arquivo do Drive — em modo local isso não é possível.');
+    return;
+  }
+  if (!GOOGLE_API_KEY || GOOGLE_API_KEY.indexOf('SUA_API_KEY_AQUI') === 0) {
+    alert('Falta configurar GOOGLE_API_KEY no topo do script com a chave de API do seu projeto no Google Cloud.');
+    return;
+  }
+  loadPicker(() => {
+    try {
+      const view = new google.picker.DocsView()
+        .setIncludeFolders(true)
+        .setSelectFolderEnabled(true);
+      const picker = new google.picker.PickerBuilder()
+        .setOAuthToken(googleAccessToken)
+        .setDeveloperKey(GOOGLE_API_KEY)
+        .addView(view)
+        .setCallback(pickerCallback)
+        .build();
+      picker.setVisible(true);
+    } catch (e) {
+      alert('Não foi possível abrir o seletor do Drive: ' + e.message);
+    }
+  });
+}
+
+function pickerCallback(data){
+  if (data.action === google.picker.Action.PICKED) {
+    const doc = data.docs[0];
+    document.getElementById('f_drive').value = doc.url || ('https://drive.google.com/open?id=' + doc.id);
+  }
+}
 
 /* ---------- ONBOARDING ---------- */
 function entrar(nome, viaGoogle){
