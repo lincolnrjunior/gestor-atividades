@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestor de Atividades — Lincoln Junior (integrado ao Google)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root {
+    --ink: #12192B; --paper: #EEF1F0; --paper-card: #FFFFFF; --paper-line: #DADFE0;
+    --steel: #2C4A73; --steel-soft: #E2E9F1;
+    --red: #B23A2E; --red-soft: #F6E4E1;
+    --orange: #C97A22; --orange-soft: #F7EBDA;
+    --amber: #B9922B; --amber-soft: #F7F0DC;
+    --green: #3A7355; --green-soft: #E3EDE6;
+    --slate: #6B7280; --slate-soft: #E7E9EB;
+    --text: #12192B; --text-muted: #5B6472;
+    --sidebar-bg: #12192B; --sidebar-text: #C7CEDD; --sidebar-accent: #3E5C8A;
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --paper: #171C24; --paper-card: #1F2530; --paper-line: #333B48;
+      --text: #E7E9EE; --text-muted: #9AA3B2;
+      --steel-soft: #253247; --red-soft: #3A2320; --orange-soft: #3A2C18;
+      --amber-soft: #362E17; --green-soft: #1F3327; --slate-soft: #2A2F38;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #171C24; --paper-card: #1F2530; --paper-line: #333B48;
+    --text: #E7E9EE; --text-muted: #9AA3B2;
+    --steel-soft: #253247; --red-soft: #3A2320; --orange-soft: #3A2C18;
+    --amber-soft: #362E17; --green-soft: #1F3327; --slate-soft: #2A2F38;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--text); font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+  h1,h2,h3,.serif { font-family:'Source Serif 4',Georgia,serif; }
+  button, input, select, textarea { font-family: inherit; }
+
+  /* ---- Onboarding ---- */
+  #onboarding {
+    min-height: 100vh; display:flex; align-items:center; justify-content:center; padding: 20px;
+  }
+  .login-card {
+    background: var(--paper-card); border:1px solid var(--paper-line); border-radius: 14px;
+    padding: 36px 34px; max-width: 420px; width:100%;
+  }
+  .login-card h1 { font-size:1.3rem; margin:0 0 6px 0; }
+  .login-card p { font-size:0.86rem; color:var(--text-muted); line-height:1.55; margin:0 0 20px 0; }
+  .g-btn {
+    width:100%; padding:11px; border-radius:8px; border:1px solid var(--paper-line);
+    background: var(--paper-card); color:var(--text); font-size:0.9rem; font-weight:600; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+  }
+  .g-btn svg { width:18px; height:18px; }
+  .login-note {
+    font-size:0.74rem; color:var(--text-muted); background:var(--slate-soft);
+    border-radius:8px; padding:10px 12px; margin-top:16px; line-height:1.5;
+  }
+  .name-fallback { margin-top:14px; display:none; flex-direction:column; gap:8px; }
+  .name-fallback input {
+    padding:9px 12px; border-radius:8px; border:1px solid var(--paper-line); background:var(--paper); color:var(--text); font-size:0.86rem;
+  }
+  .link-btn { background:none; border:none; color:var(--steel); font-size:0.8rem; cursor:pointer; padding:0; text-align:left; margin-top:12px; }
+
+  /* ---- App shell ---- */
+  #app { display:none; }
+  .app { display:flex; min-height:100vh; }
+  .sidebar { width:224px; flex-shrink:0; background:var(--sidebar-bg); color:var(--sidebar-text); padding:22px 14px; display:flex; flex-direction:column; gap:18px; }
+  .brand { padding:4px 10px 14px 10px; border-bottom:1px solid rgba(255,255,255,0.09); }
+  .brand .mark { font-family:'Source Serif 4',serif; font-weight:600; font-size:1.02rem; color:#fff; }
+  .brand .sub { font-size:0.72rem; color:#8A93A8; margin-top:3px; }
+  nav { display:flex; flex-direction:column; gap:2px; flex:1; }
+  .nav-item { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:7px; font-size:0.86rem; color:var(--sidebar-text); cursor:pointer; border:none; background:none; text-align:left; width:100%; }
+  .nav-item:hover { background:rgba(255,255,255,0.06); color:#fff; }
+  .nav-item.active { background:var(--sidebar-accent); color:#fff; }
+  .badgecount { margin-left:auto; font-size:0.68rem; background:rgba(255,255,255,0.14); padding:1px 6px; border-radius:8px; }
+  .sidebar-foot { font-size:0.68rem; color:#6E7690; padding:10px 10px 2px 10px; border-top:1px solid rgba(255,255,255,0.09); line-height:1.5; }
+  .sidebar-foot button { margin-top:6px; background:none; border:none; color:#9AA6C4; font-size:0.7rem; cursor:pointer; padding:0; text-decoration:underline; }
+
+  main { flex:1; min-width:0; display:flex; flex-direction:column; }
+  .topbar { padding:20px 32px 16px 32px; display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid var(--paper-line); flex-wrap:wrap; }
+  .topbar .who { font-size:0.82rem; color:var(--text-muted); }
+  .btn { padding:8px 14px; border-radius:8px; border:1px solid var(--paper-line); background:var(--paper-card); color:var(--text); font-size:0.83rem; cursor:pointer; white-space:nowrap; }
+  .btn-primary { background:var(--steel); border-color:var(--steel); color:#fff; }
+  .btn-danger { color:var(--red); border-color: var(--red-soft); }
+  .content { padding:26px 32px 60px 32px; flex:1; }
+  .view { display:none; }
+  .view.active { display:block; }
+
+  .greeting h1 { font-size:1.4rem; margin:0 0 4px 0; font-weight:600; }
+  .greeting p { margin:0; color:var(--text-muted); font-size:0.9rem; max-width:64ch; }
+  .section-title { font-size:0.78rem; color:var(--text-muted); margin:28px 0 12px 0; display:flex; align-items:center; gap:8px; }
+  .section-title::after { content:""; flex:1; height:1px; background:var(--paper-line); }
+
+  .priority-list { display:flex; flex-direction:column; gap:10px; }
+  .p-card { background:var(--paper-card); border:1px solid var(--paper-line); border-left:3px solid var(--slate); border-radius:10px; padding:14px 16px; display:flex; flex-direction:column; gap:6px; }
+  .p-card.crítica { border-left-color:var(--red); } .p-card.urgente { border-left-color:var(--orange); }
+  .p-card.alta { border-left-color:var(--amber); } .p-card.normal { border-left-color:var(--steel); }
+  .p-card.baixa { border-left-color:var(--slate); }
+  .p-top { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .p-title { font-weight:600; font-size:0.94rem; cursor:pointer; }
+  .badges { display:flex; gap:6px; flex-wrap:wrap; }
+  .badge { font-size:0.68rem; padding:3px 8px; border-radius:5px; background:var(--slate-soft); color:var(--text-muted); }
+  .badge.crítica { background:var(--red-soft); color:var(--red); } .badge.urgente { background:var(--orange-soft); color:var(--orange); }
+  .badge.alta { background:var(--amber-soft); color:var(--amber); } .badge.normal { background:var(--steel-soft); color:var(--steel); }
+  .badge.baixa { background:var(--slate-soft); color:var(--text-muted); }
+  .badge.concluído, .badge.respondido, .badge.arquivado { background:var(--green-soft); color:var(--green); }
+  .p-justif { font-size:0.83rem; color:var(--text-muted); line-height:1.5; }
+  .p-meta { font-size:0.75rem; color:var(--text-muted); }
+
+  .deadline-strip { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; }
+  .dl-chip { background:var(--paper-card); border:1px solid var(--paper-line); border-radius:10px; padding:12px 10px; text-align:center; }
+  .dl-chip .n { font-family:'Source Serif 4',serif; font-size:1.4rem; font-weight:600; }
+  .dl-chip .l { font-size:0.68rem; color:var(--text-muted); margin-top:2px; }
+  .dl-chip.vencido .n { color:var(--red); } .dl-chip.hoje .n { color:var(--orange); }
+
+  .kanban { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; overflow-x:auto; }
+  .k-col h3 { font-size:0.8rem; font-weight:600; margin:0 0 10px 0; color:var(--text-muted); display:flex; justify-content:space-between; }
+  .k-card { background:var(--paper-card); border:1px solid var(--paper-line); border-radius:9px; padding:11px 12px; margin-bottom:9px; font-size:0.82rem; cursor:pointer; }
+  .k-card .k-title { font-weight:600; margin-bottom:5px; }
+  .k-card .k-tags { display:flex; gap:5px; flex-wrap:wrap; margin-top:6px; }
+  .k-empty { font-size:0.76rem; color:var(--text-muted); padding:10px 4px; }
+
+  table { width:100%; border-collapse:collapse; background:var(--paper-card); border:1px solid var(--paper-line); border-radius:10px; overflow:hidden; font-size:0.83rem; }
+  th, td { padding:10px 14px; text-align:left; border-bottom:1px solid var(--paper-line); }
+  th { font-size:0.7rem; color:var(--text-muted); font-weight:600; }
+  tr:last-child td { border-bottom:none; }
+  tr.row-clickable { cursor:pointer; }
+  tr.row-clickable:hover { background: var(--slate-soft); }
+  .chip { font-size:0.7rem; padding:3px 8px; border-radius:5px; display:inline-block; }
+  .list-toolbar { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+  .list-toolbar input, .list-toolbar select { padding:8px 12px; border-radius:8px; border:1px solid var(--paper-line); background:var(--paper-card); color:var(--text); font-size:0.83rem; }
+
+  .empty-state { background:var(--paper-card); border:1px dashed var(--paper-line); border-radius:10px; padding:40px 20px; text-align:center; color:var(--text-muted); font-size:0.88rem; }
+
+  /* Modal */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(18,25,43,0.45); align-items:center; justify-content:center; padding:20px; z-index:50; }
+  .modal-overlay.active { display:flex; }
+  .modal { background:var(--paper-card); border-radius:14px; max-width:640px; width:100%; max-height:88vh; overflow-y:auto; padding:26px 28px; }
+  .modal h2 { font-size:1.1rem; margin:0 0 4px 0; }
+  .modal .sub { font-size:0.8rem; color:var(--text-muted); margin-bottom:18px; }
+  .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .form-grid .full { grid-column:1 / -1; }
+  .field label { display:block; font-size:0.74rem; color:var(--text-muted); margin-bottom:4px; }
+  .field input, .field select, .field textarea {
+    width:100%; padding:8px 10px; border-radius:7px; border:1px solid var(--paper-line); background:var(--paper); color:var(--text); font-size:0.85rem;
+  }
+  .field textarea { resize:vertical; min-height:56px; }
+  .modal-actions { display:flex; justify-content:space-between; align-items:center; margin-top:20px; gap:10px; }
+  .modal-actions .right { display:flex; gap:8px; }
+
+  .confirm-box { border:1px solid var(--amber); background:var(--amber-soft); border-radius:8px; padding:10px 12px; font-size:0.8rem; margin-top:10px; display:none; }
+  .confirm-box.active { display:block; }
+  .confirm-box label { display:flex; align-items:flex-start; gap:8px; margin-top:6px; cursor:pointer; }
+
+  .history-list { font-size:0.78rem; color:var(--text-muted); margin-top:14px; border-top:1px solid var(--paper-line); padding-top:10px; }
+  .history-row { padding:4px 0; }
+
+  @media (max-width: 900px) {
+    .sidebar { display:none; }
+    .content { padding:18px 16px 50px 16px; }
+    .topbar { padding:16px; }
+    .deadline-strip { grid-template-columns:repeat(3,1fr); }
+    .kanban { grid-template-columns:1fr; }
+    .form-grid { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ONBOARDING -->
+<div id="onboarding">
+  <div class="login-card">
+    <h1 class="serif">Gestor de Atividades</h1>
+    <p>Entre com sua conta Google para acessar seu painel e a agenda de hoje.</p>
+    <button class="g-btn" id="googleBtn">
+      <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.9 32.3 29.4 35 24 35c-6.1 0-11-4.9-11-11s4.9-11 11-11c2.8 0 5.3 1 7.3 2.7l6-6C33.9 6.5 29.2 4.5 24 4.5 13.2 4.5 4.5 13.2 4.5 24S13.2 43.5 24 43.5 43.5 34.8 43.5 24c0-1.2-.1-2.4-.3-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 18.9 13 24 13c2.8 0 5.3 1 7.3 2.7l6-6C33.9 6.5 29.2 4.5 24 4.5c-7.9 0-14.6 4.5-18 11.2z"/><path fill="#4CAF50" d="M24 43.5c5.2 0 9.9-2 13.4-5.3l-6.2-5.2C29.3 34.6 26.8 35.5 24 35.5c-5.3 0-9.8-3.4-11.4-8.2l-6.5 5C9.4 39 16.1 43.5 24 43.5z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-0.9 2.5-2.6 4.6-4.8 6l6.2 5.2C40.5 36 43.5 30.6 43.5 24c0-1.2-.1-2.4-.3-3.5z"/></svg>
+      Continuar com o Google
+    </button>
+    <div class="login-note" id="configNote">
+      Este login só funciona depois que você preencher <code>GOOGLE_CLIENT_ID</code> no topo do script deste arquivo com o Client ID do seu próprio projeto no Google Cloud, e abrir esta página em um endereço http/https cadastrado como origem autorizada — nunca direto do arquivo local. Enquanto isso não estiver feito, o botão acima mostra o erro do Google explicando o que falta, em vez de simular um login.
+    </div>
+    <button class="link-btn" id="showFallback">Testar sem Google, só com meu nome (modo local)</button>
+    <div class="name-fallback" id="nameFallback">
+      <input type="text" id="nameInput" placeholder="Seu nome">
+      <button class="btn btn-primary" id="nameSubmit">Entrar em modo local</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="mark">Gestor de Atividades</div><div class="sub" id="userLabel">Lincoln Junior</div></div>
+    <nav id="nav">
+      <button class="nav-item active" data-view="meudia">Meu dia</button>
+      <button class="nav-item" data-view="kanban">Quadro Kanban</button>
+      <button class="nav-item" data-view="lista">Lista geral<span class="badgecount" id="countTotal">0</span></button>
+    </nav>
+    <div class="sidebar-foot">
+      Atividades salvas localmente neste navegador. Login e Agenda de hoje vêm da sua conta Google real quando conectada; Drive, Gmail, ofícios detalhados e alertas automáticos ainda são etapas seguintes do plano.
+      <button id="resetData">Limpar todos os dados</button>
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div class="who">Sessão local · <span id="userLabel2">Lincoln Junior</span></div>
+      <button class="btn btn-primary" id="newBtn">+ Cadastrar atividade</button>
+    </div>
+    <div class="content">
+
+      <!-- MEU DIA -->
+      <section class="view active" id="view-meudia">
+        <div class="greeting">
+          <h1 class="serif" id="greetingText">Bom dia. Aqui estão suas atividades priorizadas.</h1>
+          <p>Prioridade calculada a partir de prazo, situação e tempo sem movimentação de cada atividade cadastrada. Você pode sobrescrever a classificação a qualquer momento.</p>
+        </div>
+        <div class="section-title">Agenda de hoje (Google Calendar)</div>
+        <div id="agendaBox" class="empty-state">Conecte sua conta Google para trazer os compromissos de hoje aqui.</div>
+
+        <div class="section-title">Prioridades de hoje</div>
+        <div class="priority-list" id="priorityList"></div>
+
+        <div class="section-title">Prazos</div>
+        <div class="deadline-strip" id="deadlineStrip"></div>
+      </section>
+
+      <!-- KANBAN -->
+      <section class="view" id="view-kanban">
+        <div class="section-title">Quadro Kanban</div>
+        <div class="kanban" id="kanbanBoard"></div>
+      </section>
+
+      <!-- LISTA -->
+      <section class="view" id="view-lista">
+        <div class="section-title">Lista geral</div>
+        <div class="list-toolbar">
+          <input type="text" id="filterText" placeholder="Buscar por título, processo, empresa...">
+          <select id="filterCategoria"><option value="">Todas as categorias</option></select>
+          <select id="filterSituacao"><option value="">Todas as situações</option></select>
+        </div>
+        <div id="listWrap"></div>
+      </section>
+
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- MODAL CADASTRO/EDIÇÃO -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">Cadastrar atividade</h2>
+    <div class="sub">Campos sem informação ficam marcados como "A confirmar" — nada é preenchido automaticamente.</div>
+    <form id="atividadeForm">
+      <input type="hidden" id="f_id">
+      <div class="form-grid">
+        <div class="field full"><label>Título *</label><input type="text" id="f_titulo" required></div>
+        <div class="field full"><label>Descrição</label><textarea id="f_descricao"></textarea></div>
+        <div class="field"><label>Categoria *</label><select id="f_categoria" required></select></div>
+        <div class="field"><label>Situação *</label><select id="f_situacao" required></select></div>
+        <div class="field"><label>Número do processo</label><input type="text" id="f_processo"></div>
+        <div class="field"><label>Número do ofício</label><input type="text" id="f_oficio"></div>
+        <div class="field"><label>Empresa / Interessado</label><input type="text" id="f_interessado"></div>
+        <div class="field"><label>Unidade / Setor</label><input type="text" id="f_unidade"></div>
+        <div class="field"><label>Responsável</label><input type="text" id="f_responsavel"></div>
+        <div class="field"><label>Prioridade manual (opcional)</label>
+          <select id="f_prioridade_manual"><option value="">Calcular automaticamente</option><option>Crítica</option><option>Urgente</option><option>Alta</option><option>Normal</option><option>Baixa</option></select>
+        </div>
+        <div class="field"><label>Prazo oficial</label><input type="date" id="f_prazo_oficial"></div>
+        <div class="field"><label>Prazo interno</label><input type="date" id="f_prazo_interno"></div>
+        <div class="field"><label>Percentual de conclusão</label><input type="number" min="0" max="100" id="f_percentual"></div>
+        <div class="field"><label>Link da pasta/documento no Drive</label><input type="text" id="f_drive" placeholder="Cole o link aqui"></div>
+        <div class="field full"><label>Próxima providência</label><input type="text" id="f_proxima"></div>
+        <div class="field full"><label>Dependência / impedimento</label><input type="text" id="f_dependencia"></div>
+        <div class="field full"><label>Observações</label><textarea id="f_observacoes"></textarea></div>
+      </div>
+
+      <div class="confirm-box" id="confirmBox">
+        <strong>Confirmação necessária</strong>
+        <label><input type="checkbox" id="f_confirm_conclusao"> Confirmo que esta atividade foi de fato concluída, com base em evidência ou decisão minha — o sistema não marca conclusão sozinho.</label>
+      </div>
+
+      <div class="history-list" id="historyList" style="display:none;"></div>
+
+      <div class="modal-actions">
+        <div class="left"><button type="button" class="btn btn-danger" id="deleteBtn" style="display:none;">Excluir</button></div>
+        <div class="right">
+          <button type="button" class="btn" id="cancelBtn">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+/* ======================================================================
+   CONFIGURAÇÃO DO GOOGLE — preencha com os dados do SEU projeto
+   (veja o passo a passo de criação em console.cloud.google.com)
+   ====================================================================== */
+const GOOGLE_CLIENT_ID = "168552508927-4474arbuqhhef9iaps6n67rr63saeslo.apps.googleusercontent.com";
+const GOOGLE_SCOPES = "email profile https://www.googleapis.com/auth/calendar.readonly";
+let googleAccessToken = null;
+let googleProfile = null;
+/* ====================================================================== */
+
+const CATEGORIAS = ["Reequilíbrio econômico-financeiro","Ofício","Licitação","IPM","Processo administrativo","Reunião","E-mail","Tratativa","Demanda interna","Demanda externa","Outros"];
+const SITUACOES = ["Não iniciada","Em análise","Em elaboração","Aguardando revisão","Aguardando assinatura","Aguardando expedição","Expedido","Aguardando resposta","Respondido","Aguardando terceiro","Suspenso","Concluído","Arquivado","Vencido","A confirmar"];
+const KANBAN_BUCKETS = {
+  "Não iniciada": "Não iniciada",
+  "Em análise":"Em andamento","Em elaboração":"Em andamento","Aguardando revisão":"Em andamento","Aguardando assinatura":"Em andamento","Aguardando expedição":"Em andamento","Expedido":"Em andamento",
+  "Aguardando resposta":"Aguardando terceiro","Aguardando terceiro":"Aguardando terceiro",
+  "Suspenso":"Suspenso / Atenção","A confirmar":"Suspenso / Atenção","Vencido":"Suspenso / Atenção",
+  "Respondido":"Concluído","Concluído":"Concluído","Arquivado":"Concluído"
+};
+const KANBAN_ORDER = ["Não iniciada","Em andamento","Aguardando terceiro","Suspenso / Atenção","Concluído"];
+
+let atividades = [];
+let currentEdit = null;
+
+function uid(){ return 'a_' + Date.now() + '_' + Math.random().toString(36).slice(2,7); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+function seedExemplos(){
+  const t = new Date(); const iso = d => { const x = new Date(t); x.setDate(x.getDate()+d); return x.toISOString().slice(0,10); };
+  return [
+    { id: uid(), titulo:"[Exemplo] Ofício — resposta pendente à Empresa Exemplo Ltda.", descricao:"", categoria:"Ofício", situacao:"Aguardando resposta", processo:"", oficio:"0142/2026", interessado:"Empresa Exemplo Ltda.", unidade:"", responsavel:"", prioridade_manual:"", prazo_oficial: iso(-2), prazo_interno:"", percentual:0, drive:"", proxima:"Enviar reiteração de cobrança", dependencia:"", observacoes:"Dado fictício de demonstração.", criado_em: iso(-5), atualizado_em: iso(-5), historico:[] },
+    { id: uid(), titulo:"[Exemplo] Parecer de reequilíbrio — Contrato Exemplo 12/2025", descricao:"", categoria:"Reequilíbrio econômico-financeiro", situacao:"Aguardando revisão", processo:"", oficio:"", interessado:"Empresa Exemplo Fictícia S.A.", unidade:"", responsavel:"", prioridade_manual:"", prazo_oficial: iso(1), prazo_interno:"", percentual:60, drive:"", proxima:"Concluir revisão do parecer", dependencia:"", observacoes:"Dado fictício de demonstração.", criado_em: iso(-3), atualizado_em: iso(-1), historico:[] },
+    { id: uid(), titulo:"[Exemplo] Pregão Exemplo nº 000/2026 sem movimentação", descricao:"", categoria:"Licitação", situacao:"Em análise", processo:"", oficio:"", interessado:"", unidade:"", responsavel:"", prioridade_manual:"", prazo_oficial:"", prazo_interno:"", percentual:30, drive:"", proxima:"Verificar documentação pendente", dependencia:"", observacoes:"Dado fictício de demonstração.", criado_em: iso(-14), atualizado_em: iso(-9), historico:[] }
+  ];
+}
+
+function load(){
+  try {
+    const raw = localStorage.getItem('gestor_atividades_v1');
+    atividades = raw ? JSON.parse(raw) : seedExemplos();
+    if (!raw) save();
+  } catch(e) { atividades = seedExemplos(); }
+}
+function save(){
+  try { localStorage.setItem('gestor_atividades_v1', JSON.stringify(atividades)); } catch(e) { console.error('Falha ao salvar', e); }
+}
+function loadPerfil(){
+  try { return JSON.parse(localStorage.getItem('gestor_perfil_v1') || 'null'); } catch(e) { return null; }
+}
+function savePerfil(p){ try { localStorage.setItem('gestor_perfil_v1', JSON.stringify(p)); } catch(e){} }
+
+function diffDias(dataISO){
+  if (!dataISO) return null;
+  const hoje = new Date(todayISO()+'T00:00:00');
+  const alvo = new Date(dataISO+'T00:00:00');
+  return Math.round((alvo - hoje) / 86400000);
+}
+
+function computarPrioridade(a){
+  if (a.prioridade_manual) {
+    return { nivel: a.prioridade_manual, justificativa: "Prioridade definida manualmente por você — o cálculo automático não é aplicado enquanto essa definição estiver ativa.", diasPrazo: diffDias(a.prazo_oficial || a.prazo_interno) };
+  }
+  const prazo = a.prazo_oficial || a.prazo_interno;
+  const diasPrazo = diffDias(prazo);
+  const diasSemMov = a.atualizado_em ? Math.round((new Date(todayISO()) - new Date(a.atualizado_em)) / 86400000) : 0;
+  let nivel = "Normal";
+  let motivos = [];
+
+  if (diasPrazo !== null && diasPrazo < 0) {
+    nivel = "Crítica";
+    motivos.push(`o prazo venceu há ${Math.abs(diasPrazo)} dia(s)`);
+  } else if (diasPrazo !== null && diasPrazo <= 2) {
+    nivel = "Urgente";
+    motivos.push(diasPrazo === 0 ? "o prazo vence hoje" : `o prazo vence em ${diasPrazo} dia(s)`);
+  } else if (diasPrazo !== null && diasPrazo <= 7) {
+    nivel = "Alta";
+    motivos.push(`o prazo vence em ${diasPrazo} dias`);
+  } else if (diasSemMov >= 10) {
+    nivel = "Alta";
+    motivos.push(`está sem movimentação há ${diasSemMov} dias`);
+  } else if (diasPrazo === null) {
+    nivel = "Baixa";
+    motivos.push("não há prazo definido");
+  }
+
+  if (["Aguardando resposta","Aguardando terceiro"].includes(a.situacao) && nivel !== "Crítica") {
+    motivos.push("depende de retorno de terceiro, o que pede cobrança e não apenas execução direta");
+  }
+
+  const justificativa = motivos.length
+    ? `Prioridade ${nivel.toLowerCase()} porque ${motivos.join(" e ")}.`
+    : `Prioridade ${nivel.toLowerCase()} — sem fatores de risco identificados no momento.`;
+
+  return { nivel, justificativa, diasPrazo, diasSemMov };
+}
+
+function badgeClass(nivel){ return (nivel||"").toLowerCase(); }
+
+function fmtData(iso){
+  if (!iso) return "—";
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+/* ---------- RENDER: MEU DIA ---------- */
+function renderMeuDia(){
+  const nome = (loadPerfil()||{}).nome || "Lincoln";
+  document.getElementById('greetingText').textContent = `Bom dia, ${nome}. Estas são as atividades que recomendo priorizar hoje.`;
+
+  const withPrio = atividades
+    .filter(a => !["Concluído","Arquivado","Respondido"].includes(a.situacao))
+    .map(a => ({ a, p: computarPrioridade(a) }));
+
+  const ordem = { "Crítica":0, "Urgente":1, "Alta":2, "Normal":3, "Baixa":4 };
+  withPrio.sort((x,y) => ordem[x.p.nivel]-ordem[y.p.nivel]);
+  const top = withPrio.slice(0,5);
+
+  const list = document.getElementById('priorityList');
+  if (top.length === 0) {
+    list.innerHTML = '<div class="empty-state">Nenhuma atividade em aberto. Cadastre a primeira usando o botão "Cadastrar atividade".</div>';
+  } else {
+    list.innerHTML = top.map(({a,p}) => `
+      <div class="p-card ${badgeClass(p.nivel)}">
+        <div class="p-top">
+          <div class="p-title" onclick="abrirEdicao('${a.id}')">${escapeHtml(a.titulo)}</div>
+          <div class="badges"><span class="badge ${badgeClass(p.nivel)}">${p.nivel}</span><span class="badge">${a.categoria}</span></div>
+        </div>
+        <div class="p-justif">${p.justificativa}</div>
+        <div class="p-meta">${a.processo ? 'Processo '+escapeHtml(a.processo)+' · ' : ''}${a.prazo_oficial ? 'Prazo: '+fmtData(a.prazo_oficial) : 'Sem prazo cadastrado'}</div>
+      </div>
+    `).join('');
+  }
+
+  const buckets = { vencido:0, hoje:0, d3:0, d7:0, d15:0, d30:0 };
+  atividades.forEach(a => {
+    const dp = diffDias(a.prazo_oficial || a.prazo_interno);
+    if (dp === null) return;
+    if (dp < 0) buckets.vencido++;
+    else if (dp === 0) buckets.hoje++;
+    else if (dp <= 3) buckets.d3++;
+    else if (dp <= 7) buckets.d7++;
+    else if (dp <= 15) buckets.d15++;
+    else if (dp <= 30) buckets.d30++;
+  });
+  document.getElementById('deadlineStrip').innerHTML = `
+    <div class="dl-chip vencido"><div class="n">${buckets.vencido}</div><div class="l">Vencidos</div></div>
+    <div class="dl-chip hoje"><div class="n">${buckets.hoje}</div><div class="l">Hoje</div></div>
+    <div class="dl-chip"><div class="n">${buckets.d3}</div><div class="l">3 dias</div></div>
+    <div class="dl-chip"><div class="n">${buckets.d7}</div><div class="l">7 dias</div></div>
+    <div class="dl-chip"><div class="n">${buckets.d15}</div><div class="l">15 dias</div></div>
+    <div class="dl-chip"><div class="n">${buckets.d30}</div><div class="l">30 dias</div></div>
+  `;
+}
+
+/* ---------- RENDER: KANBAN ---------- */
+function renderKanban(){
+  const cols = {}; KANBAN_ORDER.forEach(k => cols[k] = []);
+  atividades.forEach(a => { const b = KANBAN_BUCKETS[a.situacao] || "Não iniciada"; cols[b].push(a); });
+  document.getElementById('kanbanBoard').innerHTML = KANBAN_ORDER.map(col => `
+    <div class="k-col">
+      <h3>${col}<span>${cols[col].length}</span></h3>
+      ${cols[col].length === 0 ? '<div class="k-empty">Vazio</div>' : cols[col].map(a => {
+        const p = computarPrioridade(a);
+        return `<div class="k-card" onclick="abrirEdicao('${a.id}')">
+          <div class="k-title">${escapeHtml(a.titulo)}</div>
+          ${a.prazo_oficial ? 'Prazo: '+fmtData(a.prazo_oficial) : 'Sem prazo'}
+          <div class="k-tags"><span class="badge ${badgeClass(p.nivel)}">${p.nivel}</span></div>
+        </div>`;
+      }).join('')}
+    </div>
+  `).join('');
+}
+
+/* ---------- RENDER: LISTA ---------- */
+function renderFiltros(){
+  const cSel = document.getElementById('filterCategoria');
+  const sSel = document.getElementById('filterSituacao');
+  if (cSel.options.length <= 1) CATEGORIAS.forEach(c => cSel.innerHTML += `<option>${c}</option>`);
+  if (sSel.options.length <= 1) SITUACOES.forEach(s => sSel.innerHTML += `<option>${s}</option>`);
+}
+function renderLista(){
+  renderFiltros();
+  const texto = document.getElementById('filterText').value.toLowerCase();
+  const cat = document.getElementById('filterCategoria').value;
+  const sit = document.getElementById('filterSituacao').value;
+  let filtradas = atividades.filter(a => {
+    const okTexto = !texto || (a.titulo+a.processo+a.interessado+a.oficio).toLowerCase().includes(texto);
+    const okCat = !cat || a.categoria === cat;
+    const okSit = !sit || a.situacao === sit;
+    return okTexto && okCat && okSit;
+  });
+  const wrap = document.getElementById('listWrap');
+  if (filtradas.length === 0) {
+    wrap.innerHTML = '<div class="empty-state">Nenhuma atividade encontrada com esse filtro.</div>';
+    return;
+  }
+  wrap.innerHTML = `<table><thead><tr><th>Título</th><th>Categoria</th><th>Situação</th><th>Prazo</th><th>Prioridade</th></tr></thead><tbody>
+    ${filtradas.map(a => {
+      const p = computarPrioridade(a);
+      return `<tr class="row-clickable" onclick="abrirEdicao('${a.id}')">
+        <td>${escapeHtml(a.titulo)}</td>
+        <td>${a.categoria}</td>
+        <td><span class="chip badge ${badgeClass(a.situacao==='Concluído'||a.situacao==='Respondido'||a.situacao==='Arquivado' ? 'concluído' : '')}">${a.situacao}</span></td>
+        <td>${a.prazo_oficial ? fmtData(a.prazo_oficial) : '—'}</td>
+        <td><span class="badge ${badgeClass(p.nivel)}">${p.nivel}</span></td>
+      </tr>`;
+    }).join('')}
+  </tbody></table>`;
+}
+
+function escapeHtml(s){ return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function renderAll(){
+  renderMeuDia(); renderKanban(); renderLista();
+  document.getElementById('countTotal').textContent = atividades.length;
+}
+
+/* ---------- MODAL ---------- */
+function popularSelects(){
+  const cSel = document.getElementById('f_categoria');
+  const sSel = document.getElementById('f_situacao');
+  if (cSel.options.length === 0) CATEGORIAS.forEach(c => cSel.innerHTML += `<option>${c}</option>`);
+  if (sSel.options.length === 0) SITUACOES.forEach(s => sSel.innerHTML += `<option>${s}</option>`);
+}
+function abrirNovo(){
+  currentEdit = null;
+  popularSelects();
+  document.getElementById('modalTitle').textContent = 'Cadastrar atividade';
+  document.getElementById('atividadeForm').reset();
+  document.getElementById('f_id').value = '';
+  document.getElementById('deleteBtn').style.display = 'none';
+  document.getElementById('historyList').style.display = 'none';
+  document.getElementById('confirmBox').classList.remove('active');
+  document.getElementById('modalOverlay').classList.add('active');
+}
+function abrirEdicao(id){
+  const a = atividades.find(x => x.id === id);
+  if (!a) return;
+  currentEdit = a;
+  popularSelects();
+  document.getElementById('modalTitle').textContent = 'Editar atividade';
+  document.getElementById('f_id').value = a.id;
+  document.getElementById('f_titulo').value = a.titulo || '';
+  document.getElementById('f_descricao').value = a.descricao || '';
+  document.getElementById('f_categoria').value = a.categoria || '';
+  document.getElementById('f_situacao').value = a.situacao || '';
+  document.getElementById('f_processo').value = a.processo || '';
+  document.getElementById('f_oficio').value = a.oficio || '';
+  document.getElementById('f_interessado').value = a.interessado || '';
+  document.getElementById('f_unidade').value = a.unidade || '';
+  document.getElementById('f_responsavel').value = a.responsavel || '';
+  document.getElementById('f_prioridade_manual').value = a.prioridade_manual || '';
+  document.getElementById('f_prazo_oficial').value = a.prazo_oficial || '';
+  document.getElementById('f_prazo_interno').value = a.prazo_interno || '';
+  document.getElementById('f_percentual').value = a.percentual || 0;
+  document.getElementById('f_drive').value = a.drive || '';
+  document.getElementById('f_proxima').value = a.proxima || '';
+  document.getElementById('f_dependencia').value = a.dependencia || '';
+  document.getElementById('f_observacoes').value = a.observacoes || '';
+  document.getElementById('f_confirm_conclusao').checked = false;
+  document.getElementById('confirmBox').classList.remove('active');
+  document.getElementById('deleteBtn').style.display = 'inline-block';
+  const hist = a.historico || [];
+  const histEl = document.getElementById('historyList');
+  if (hist.length) {
+    histEl.style.display = 'block';
+    histEl.innerHTML = '<strong>Histórico</strong>' + hist.slice().reverse().map(h => `<div class="history-row">${fmtData(h.quando)} — ${escapeHtml(h.campo)}: "${escapeHtml(h.de)}" → "${escapeHtml(h.para)}"</div>`).join('');
+  } else { histEl.style.display = 'none'; }
+  document.getElementById('modalOverlay').classList.add('active');
+}
+function fecharModal(){ document.getElementById('modalOverlay').classList.remove('active'); }
+
+document.getElementById('newBtn').addEventListener('click', abrirNovo);
+document.getElementById('cancelBtn').addEventListener('click', fecharModal);
+document.getElementById('modalOverlay').addEventListener('click', e => { if (e.target.id === 'modalOverlay') fecharModal(); });
+
+document.getElementById('f_situacao').addEventListener('change', function(){
+  const box = document.getElementById('confirmBox');
+  if (this.value === 'Concluído') box.classList.add('active'); else box.classList.remove('active');
+});
+
+document.getElementById('deleteBtn').addEventListener('click', function(){
+  if (!currentEdit) return;
+  if (!confirm('Excluir esta atividade? Esta ação não pode ser desfeita.')) return;
+  atividades = atividades.filter(a => a.id !== currentEdit.id);
+  save(); renderAll(); fecharModal();
+});
+
+document.getElementById('atividadeForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  const situacao = document.getElementById('f_situacao').value;
+  if (situacao === 'Concluído' && !document.getElementById('f_confirm_conclusao').checked) {
+    alert('Confirme a caixa de conclusão antes de salvar esta atividade como Concluída.');
+    return;
+  }
+  const id = document.getElementById('f_id').value || uid();
+  const isNew = !document.getElementById('f_id').value;
+  const historico = currentEdit ? (currentEdit.historico || []) : [];
+
+  const novo = {
+    id,
+    titulo: document.getElementById('f_titulo').value.trim(),
+    descricao: document.getElementById('f_descricao').value.trim(),
+    categoria: document.getElementById('f_categoria').value,
+    situacao: situacao,
+    processo: document.getElementById('f_processo').value.trim(),
+    oficio: document.getElementById('f_oficio').value.trim(),
+    interessado: document.getElementById('f_interessado').value.trim(),
+    unidade: document.getElementById('f_unidade').value.trim(),
+    responsavel: document.getElementById('f_responsavel').value.trim(),
+    prioridade_manual: document.getElementById('f_prioridade_manual').value,
+    prazo_oficial: document.getElementById('f_prazo_oficial').value,
+    prazo_interno: document.getElementById('f_prazo_interno').value,
+    percentual: Number(document.getElementById('f_percentual').value || 0),
+    drive: document.getElementById('f_drive').value.trim(),
+    proxima: document.getElementById('f_proxima').value.trim(),
+    dependencia: document.getElementById('f_dependencia').value.trim(),
+    observacoes: document.getElementById('f_observacoes').value.trim(),
+    criado_em: currentEdit ? currentEdit.criado_em : todayISO(),
+    atualizado_em: todayISO(),
+    historico
+  };
+
+  if (currentEdit) {
+    ['situacao','prazo_oficial','percentual'].forEach(campo => {
+      if (String(currentEdit[campo]||'') !== String(novo[campo]||'')) {
+        novo.historico.push({ campo, de: currentEdit[campo]||'(vazio)', para: novo[campo]||'(vazio)', quando: todayISO() });
+      }
+    });
+    atividades = atividades.map(a => a.id === id ? novo : a);
+  } else {
+    atividades.push(novo);
+  }
+  save(); renderAll(); fecharModal();
+});
+
+document.querySelectorAll('.nav-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + btn.dataset.view).classList.add('active');
+  });
+});
+['filterText','filterCategoria','filterSituacao'].forEach(id => document.getElementById(id).addEventListener('input', renderLista));
+
+document.getElementById('resetData').addEventListener('click', () => {
+  if (!confirm('Isso apaga todas as atividades salvas neste navegador. Continuar?')) return;
+  atividades = seedExemplos(); save(); renderAll();
+});
+
+/* ---------- ONBOARDING ---------- */
+function entrar(nome, viaGoogle){
+  savePerfil({ nome: nome || 'Lincoln', viaGoogle: !!viaGoogle });
+  document.getElementById('userLabel').textContent = nome || 'Lincoln';
+  document.getElementById('userLabel2').textContent = (nome || 'Lincoln') + (viaGoogle ? ' · conta Google' : ' · modo local');
+  document.getElementById('onboarding').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  load(); renderAll();
+  if (viaGoogle) buscarAgendaDeHoje();
+}
+
+document.getElementById('showFallback').addEventListener('click', () => {
+  document.getElementById('nameFallback').style.display = 'flex';
+});
+document.getElementById('nameSubmit').addEventListener('click', () => {
+  const v = document.getElementById('nameInput').value.trim();
+  entrar(v || 'Lincoln', false);
+});
+
+document.getElementById('googleBtn').addEventListener('click', () => {
+  if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.indexOf('SEU_CLIENT_ID_AQUI') === 0) {
+    alert('Este arquivo ainda não tem um Client ID configurado. Abra o código, preencha a constante GOOGLE_CLIENT_ID no topo do <script> com o Client ID do seu projeto no Google Cloud e recarregue a página.');
+    return;
+  }
+  if (typeof google === 'undefined' || !google.accounts) {
+    alert('O script de autenticação do Google não carregou. Isso costuma acontecer quando a página é aberta direto do arquivo local (file://) em vez de um endereço http/https, ou quando não há conexão com a internet.');
+    return;
+  }
+  try {
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: GOOGLE_SCOPES,
+      callback: async (resp) => {
+        if (resp.error) {
+          alert('O Google recusou o login: ' + resp.error + '. Confira se este endereço está cadastrado em "Origens JavaScript autorizadas" no seu projeto.');
+          return;
+        }
+        googleAccessToken = resp.access_token;
+        try {
+          const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + googleAccessToken } });
+          googleProfile = await r.json();
+          entrar(googleProfile.name || googleProfile.email || 'Usuário Google', true);
+        } catch (e) {
+          alert('Login concluído, mas não foi possível buscar seu perfil do Google agora. Você pode continuar em modo local.');
+          entrar('Usuário Google', true);
+        }
+      }
+    });
+    client.requestAccessToken();
+  } catch (e) {
+    alert('Não foi possível iniciar o login do Google: ' + e.message);
+  }
+});
+
+async function buscarAgendaDeHoje(){
+  const box = document.getElementById('agendaBox');
+  if (!googleAccessToken) {
+    box.className = 'empty-state';
+    box.textContent = 'Conecte sua conta Google para trazer os compromissos de hoje aqui.';
+    return;
+  }
+  box.className = 'empty-state';
+  box.textContent = 'Buscando compromissos de hoje na sua Google Agenda...';
+  try {
+    const inicio = new Date(); inicio.setHours(0,0,0,0);
+    const fim = new Date(); fim.setHours(23,59,59,999);
+    const params = new URLSearchParams({
+      timeMin: inicio.toISOString(), timeMax: fim.toISOString(),
+      singleEvents: 'true', orderBy: 'startTime'
+    });
+    const r = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?' + params.toString(), {
+      headers: { Authorization: 'Bearer ' + googleAccessToken }
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    const eventos = data.items || [];
+    if (eventos.length === 0) {
+      box.textContent = 'Nenhum compromisso encontrado na sua Google Agenda para hoje.';
+      return;
+    }
+    box.className = '';
+    box.innerHTML = eventos.map(ev => {
+      const inicioEv = ev.start.dateTime ? new Date(ev.start.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : 'Dia inteiro';
+      return `<div class="mini-list" style="margin-bottom:8px;"><div class="mini-row" style="border-top:none;"><span class="r-title">${inicioEv} — ${escapeHtml(ev.summary || '(sem título)')}</span><span class="r-tag">${ev.location ? escapeHtml(ev.location) : ''}</span></div></div>`;
+    }).join('');
+  } catch (e) {
+    box.textContent = 'Não foi possível buscar a agenda agora (' + e.message + '). O token de acesso do Google expira após um tempo — talvez seja necessário entrar novamente.';
+  }
+}
+
+(function init(){
+  const perfil = loadPerfil();
+  if (perfil && !perfil.viaGoogle) entrar(perfil.nome, false);
+  // Sessões via Google não são restauradas automaticamente: o token de acesso
+  // não fica salvo (por segurança), então é preciso clicar em "Continuar com
+  // o Google" novamente a cada visita para reobter um token válido.
+})();
+</script>
+</body>
+</html>
