@@ -84,6 +84,11 @@
   main { flex:1; min-width:0; display:flex; flex-direction:column; }
   .topbar { padding:20px 32px 16px 32px; display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid var(--paper-line); flex-wrap:wrap; }
   .topbar .who { font-size:0.82rem; color:var(--text-muted); }
+  .topbar-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+  .sync-status { font-size:0.74rem; color:var(--text-muted); }
+  .sync-status[data-state="ok"] { color:var(--green); }
+  .sync-status[data-state="pending"] { color:var(--orange); }
+  .sync-status[data-state="error"] { color:var(--red); }
   .btn { padding:8px 14px; border-radius:8px; border:1px solid var(--paper-line); background:var(--paper-card); color:var(--text); font-size:0.83rem; cursor:pointer; white-space:nowrap; }
   .btn-primary { background:var(--steel); border-color:var(--steel); color:#fff; }
   .btn-danger { color:var(--red); border-color: var(--red-soft); }
@@ -244,6 +249,7 @@
     </button>
     <div class="login-note" id="configNote">
       Este login só funciona depois que você preencher <code>GOOGLE_CLIENT_ID</code> no topo do script deste arquivo com o Client ID do seu próprio projeto no Google Cloud, e abrir esta página em um endereço http/https cadastrado como origem autorizada — nunca direto do arquivo local. Enquanto isso não estiver feito, o botão acima mostra o erro do Google explicando o que falta, em vez de simular um login.
+      Ao entrar com a mesma conta Google no computador e no celular, atividades e notas serão sincronizadas automaticamente pelo Google Drive.
     </div>
     <button class="link-btn" id="showFallback">Testar sem Google, só com meu nome (modo local)</button>
     <div class="name-fallback" id="nameFallback">
@@ -266,6 +272,7 @@
     </nav>
     <div class="sidebar-foot">
       Atividades salvas localmente neste navegador. Login, Agenda de hoje e vínculo de arquivos do Drive vêm da sua conta Google real quando conectada; Gmail, ofícios detalhados e alertas automáticos ainda são etapas seguintes do plano.
+      Com a conta Google conectada, uma cópia sincronizada das atividades e notas também é mantida no Google Drive para uso no computador e no celular.
       <button id="resetData">Limpar todos os dados</button>
     </div>
   </aside>
@@ -273,7 +280,11 @@
   <main>
     <div class="topbar">
       <div class="who">Sessão local · <span id="userLabel2">Lincoln Junior</span></div>
-      <button class="btn btn-primary" id="newBtn">+ Cadastrar atividade</button>
+      <div class="topbar-actions">
+        <span class="sync-status" id="syncStatus" data-state="local" aria-live="polite">Somente neste aparelho</span>
+        <button class="btn" id="syncBtn" type="button" style="display:none;">Sincronizar agora</button>
+        <button class="btn btn-primary" id="newBtn">+ Cadastrar atividade</button>
+      </div>
     </div>
     <div class="content">
 
@@ -510,11 +521,17 @@
    ====================================================================== */
 const GOOGLE_CLIENT_ID = "168552508927-4474arbuqhhef9iaps6n67rr63saeslo.apps.googleusercontent.com";
 const GOOGLE_API_KEY = "SUA_API_KEY_AQUI";
-const GOOGLE_SCOPES = "email profile https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/gmail.readonly";
+const GOOGLE_SCOPES = "email profile https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/gmail.readonly";
+const SYNC_FILE_NAME = "gestor-demandas-v2.json";
+const SYNC_META_KEY = "gestor_sync_meta_v2";
 let pickerInited = false;
 let googleAccessToken = null;
 let googleProfile = null;
 let emailsTrabalho = [];
+let syncFileId = null;
+let syncTimer = null;
+let sincronizando = false;
+let syncPendenteDuranteExecucao = false;
 
 /* Palavras-chave usadas para sinalizar e-mails como possivelmente relacionados ao
    trabalho — isto é um filtro simples por texto, não uma classificação por IA.
@@ -541,6 +558,7 @@ const KANBAN_ORDER = ["Não iniciada","Em andamento","Aguardando terceiro","Susp
 let atividades = [];
 let currentEdit = null;
 let currentDetailId = null;
+let syncMeta = { updatedAt:'', deletedAtividades:{}, deletedNotas:{} };
 
 function uid(){ return 'a_' + Date.now() + '_' + Math.random().toString(36).slice(2,7); }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
@@ -592,15 +610,17 @@ function obterIdsRelacionados(a){
 
 function alterarSituacaoComHistorico(atividade, novaSituacao){
   if (!atividade || atividade.situacao === novaSituacao) return;
+  const agora = new Date().toISOString();
   const anterior = atividade.situacao || '(vazio)';
   atividade.situacao = novaSituacao;
   atividade.atualizado_em = todayISO();
+  atividade._sync_em = agora;
   atividade.historico = atividade.historico || [];
   atividade.historico.push({
     campo: 'situacao',
     de: anterior,
     para: novaSituacao,
-    quando: new Date().toISOString(),
+    quando: agora,
     origem: 'Fluxo automático de ofício resposta'
   });
 }
@@ -623,16 +643,261 @@ function seedExemplos(){
   ];
 }
 
+function carregarMetaSync(){
+  try {
+    const meta = JSON.parse(localStorage.getItem(SYNC_META_KEY) || '{}');
+    return {
+      updatedAt: meta.updatedAt || '',
+      deletedAtividades: meta.deletedAtividades || {},
+      deletedNotas: meta.deletedNotas || {}
+    };
+  } catch(e) {
+    return { updatedAt:'', deletedAtividades:{}, deletedNotas:{} };
+  }
+}
+
+function salvarAtividadesLocal(){
+  try { localStorage.setItem('gestor_atividades_v1', JSON.stringify(atividades)); }
+  catch(e) { console.error('Falha ao salvar atividades localmente', e); }
+}
+
+function salvarNotasLocal(){
+  try { localStorage.setItem('gestor_notas_v1', JSON.stringify(notasRapidas)); }
+  catch(e) { console.error('Falha ao salvar notas localmente', e); }
+}
+
+function salvarMetaSync(){
+  try { localStorage.setItem(SYNC_META_KEY, JSON.stringify(syncMeta)); }
+  catch(e) { console.error('Falha ao salvar controle de sincronização', e); }
+}
+
+function atualizarStatusSync(texto, estado = 'local'){
+  const el = document.getElementById('syncStatus');
+  if (!el) return;
+  el.textContent = texto;
+  el.dataset.state = estado;
+}
+
+function registrarAlteracaoLocal(){
+  syncMeta.updatedAt = new Date().toISOString();
+  salvarMetaSync();
+  if (sincronizando) syncPendenteDuranteExecucao = true;
+  agendarSincronizacaoDrive();
+}
+
+function marcarAtividadeAlterada(id){
+  const atividade = atividades.find(a => a.id === id);
+  if (atividade) atividade._sync_em = new Date().toISOString();
+}
+
+function registrarExclusao(tipo, id){
+  const mapa = tipo === 'nota' ? syncMeta.deletedNotas : syncMeta.deletedAtividades;
+  mapa[id] = new Date().toISOString();
+}
+
 function load(){
+  syncMeta = carregarMetaSync();
   try {
     const raw = localStorage.getItem('gestor_atividades_v1');
     atividades = raw ? JSON.parse(raw) : seedExemplos();
-    normalizarVinculosCarregados();
-    save();
-  } catch(e) { atividades = seedExemplos(); }
+  } catch(e) {
+    atividades = seedExemplos();
+  }
+  normalizarVinculosCarregados();
+  salvarAtividadesLocal();
 }
+
 function save(){
-  try { localStorage.setItem('gestor_atividades_v1', JSON.stringify(atividades)); } catch(e) { console.error('Falha ao salvar', e); }
+  salvarAtividadesLocal();
+  registrarAlteracaoLocal();
+}
+
+function timestampRegistro(registro){
+  const valor = registro && (registro._sync_em || registro.atualizado_em || registro.criado_em || registro.data_entrada);
+  const tempo = valor ? Date.parse(valor) : 0;
+  return Number.isFinite(tempo) ? tempo : 0;
+}
+
+function mesclarExclusoes(a = {}, b = {}){
+  const resultado = { ...a };
+  Object.entries(b).forEach(([id, quando]) => {
+    if (!resultado[id] || Date.parse(quando) > Date.parse(resultado[id])) resultado[id] = quando;
+  });
+  return resultado;
+}
+
+function mesclarRegistros(locais = [], remotos = [], exclusoes = {}){
+  const mapa = new Map();
+  [...remotos, ...locais].forEach(registro => {
+    if (!registro || !registro.id) return;
+    const atual = mapa.get(registro.id);
+    if (!atual || timestampRegistro(registro) >= timestampRegistro(atual)) mapa.set(registro.id, registro);
+  });
+  return [...mapa.values()].filter(registro => {
+    const excluidoEm = exclusoes[registro.id] ? Date.parse(exclusoes[registro.id]) : 0;
+    return !excluidoEm || timestampRegistro(registro) > excluidoEm;
+  });
+}
+
+function estadoLocalSync(){
+  return {
+    version: 2,
+    updatedAt: syncMeta.updatedAt || '',
+    atividades,
+    notasRapidas,
+    deletedAtividades: syncMeta.deletedAtividades,
+    deletedNotas: syncMeta.deletedNotas
+  };
+}
+
+function mesclarEstados(local, remoto){
+  const deletedAtividades = mesclarExclusoes(local.deletedAtividades, remoto.deletedAtividades);
+  const deletedNotas = mesclarExclusoes(local.deletedNotas, remoto.deletedNotas);
+  const locaisSemExemplosDuplicados = remoto.updatedAt && !local.updatedAt
+    ? (local.atividades || []).filter(a => !String(a.titulo || '').startsWith('[Exemplo]'))
+    : (local.atividades || []);
+  return {
+    version: 2,
+    updatedAt: new Date().toISOString(),
+    atividades: mesclarRegistros(locaisSemExemplosDuplicados, remoto.atividades || [], deletedAtividades),
+    notasRapidas: mesclarRegistros(local.notasRapidas || [], remoto.notasRapidas || [], deletedNotas),
+    deletedAtividades,
+    deletedNotas
+  };
+}
+
+function estadoComparavel(estado){
+  const ordenar = lista => [...(lista || [])].sort((a,b) => String(a.id).localeCompare(String(b.id)));
+  const ordenarMapa = mapa => Object.fromEntries(Object.entries(mapa || {}).sort(([a],[b]) => a.localeCompare(b)));
+  return JSON.stringify({
+    atividades: ordenar(estado.atividades),
+    notasRapidas: ordenar(estado.notasRapidas),
+    deletedAtividades: ordenarMapa(estado.deletedAtividades),
+    deletedNotas: ordenarMapa(estado.deletedNotas)
+  });
+}
+
+function aplicarEstadoSync(estado){
+  const editId = currentEdit && currentEdit.id;
+  atividades = Array.isArray(estado.atividades) ? estado.atividades : [];
+  notasRapidas = Array.isArray(estado.notasRapidas) ? estado.notasRapidas : [];
+  syncMeta = {
+    updatedAt: estado.updatedAt || new Date().toISOString(),
+    deletedAtividades: estado.deletedAtividades || {},
+    deletedNotas: estado.deletedNotas || {}
+  };
+  normalizarVinculosCarregados();
+  currentEdit = editId ? (atividades.find(a => a.id === editId) || null) : null;
+  salvarAtividadesLocal();
+  salvarNotasLocal();
+  salvarMetaSync();
+}
+
+async function driveFetch(url, options = {}){
+  const response = await fetch(url, {
+    ...options,
+    headers: { Authorization: 'Bearer ' + googleAccessToken, ...(options.headers || {}) }
+  });
+  if (!response.ok) {
+    const erro = await response.json().catch(() => ({}));
+    if (response.status === 401) googleAccessToken = null;
+    throw new Error(response.status === 401
+      ? 'Sessão Google expirada. Entre novamente para continuar sincronizando.'
+      : ((erro.error && erro.error.message) || ('HTTP ' + response.status)));
+  }
+  return response;
+}
+
+async function localizarArquivoSync(){
+  if (syncFileId) return syncFileId;
+  const params = new URLSearchParams({
+    spaces: 'appDataFolder',
+    q: `name='${SYNC_FILE_NAME}' and trashed=false`,
+    fields: 'files(id,name,modifiedTime)',
+    orderBy: 'modifiedTime desc',
+    pageSize: '10'
+  });
+  const response = await driveFetch('https://www.googleapis.com/drive/v3/files?' + params.toString());
+  const dados = await response.json();
+  syncFileId = dados.files && dados.files[0] ? dados.files[0].id : null;
+  return syncFileId;
+}
+
+async function criarArquivoSync(){
+  const response = await driveFetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: SYNC_FILE_NAME, mimeType:'application/json', parents:['appDataFolder'] })
+  });
+  const arquivo = await response.json();
+  syncFileId = arquivo.id;
+  return syncFileId;
+}
+
+async function baixarEstadoDrive(id){
+  const response = await driveFetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`);
+  const texto = await response.text();
+  if (!texto) return null;
+  try {
+    const estado = JSON.parse(texto);
+    return estado && Array.isArray(estado.atividades) ? estado : null;
+  } catch(e) {
+    return null;
+  }
+}
+
+async function enviarEstadoDrive(id, estado){
+  await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+    body: JSON.stringify(estado)
+  });
+}
+
+async function sincronizarDrive(){
+  if (!googleAccessToken || sincronizando) return;
+  sincronizando = true;
+  syncPendenteDuranteExecucao = false;
+  atualizarStatusSync('Sincronizando…', 'pending');
+  try {
+    let id = await localizarArquivoSync();
+    let estado;
+    let precisaEnviar = true;
+    if (id) {
+      const remoto = await baixarEstadoDrive(id);
+      if (remoto) {
+        estado = mesclarEstados(estadoLocalSync(), remoto);
+        precisaEnviar = estadoComparavel(estado) !== estadoComparavel(remoto);
+        if (!precisaEnviar) estado.updatedAt = remoto.updatedAt || estado.updatedAt;
+      } else {
+        estado = { ...estadoLocalSync(), updatedAt:new Date().toISOString() };
+      }
+    } else {
+      id = await criarArquivoSync();
+      estado = { ...estadoLocalSync(), updatedAt:new Date().toISOString() };
+    }
+    aplicarEstadoSync(estado);
+    if (precisaEnviar) await enviarEstadoDrive(id, estado);
+    renderAll();
+    if (currentDetailId && document.getElementById('detailModalOverlay').classList.contains('active')) abrirDetalhes(currentDetailId);
+    atualizarStatusSync('Sincronizado', 'ok');
+  } catch(e) {
+    console.error('Falha na sincronização com o Google Drive:', e);
+    atualizarStatusSync(e.message.startsWith('Sessão Google expirada') ? 'Reconecte ao Google' : 'Falha ao sincronizar', 'error');
+  } finally {
+    sincronizando = false;
+    if (syncPendenteDuranteExecucao) agendarSincronizacaoDrive();
+  }
+}
+
+function agendarSincronizacaoDrive(){
+  if (!googleAccessToken) {
+    atualizarStatusSync('Somente neste aparelho', 'local');
+    return;
+  }
+  atualizarStatusSync('Alterações pendentes', 'pending');
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(sincronizarDrive, 800);
 }
 function loadPerfil(){
   try { return JSON.parse(localStorage.getItem('gestor_perfil_v1') || 'null'); } catch(e) { return null; }
@@ -800,7 +1065,8 @@ function loadNotas(){
   } catch(e) { notasRapidas = []; }
 }
 function saveNotas(){
-  try { localStorage.setItem('gestor_notas_v1', JSON.stringify(notasRapidas)); } catch(e) { console.error('Falha ao salvar notas', e); }
+  salvarNotasLocal();
+  registrarAlteracaoLocal();
 }
 function renderNotas(){
   const board = document.getElementById('notasBoard');
@@ -817,6 +1083,7 @@ function renderNotas(){
   `).join('');
 }
 function removerNota(id){
+  registrarExclusao('nota', id);
   notasRapidas = notasRapidas.filter(n => n.id !== id);
   saveNotas();
   renderNotas();
@@ -825,7 +1092,8 @@ document.getElementById('addNotaBtn').addEventListener('click', () => {
   const input = document.getElementById('novaNotaInput');
   const texto = input.value.trim();
   if (!texto) return;
-  notasRapidas.push({ id: uid(), texto, criado_em: new Date().toISOString() });
+  const agora = new Date().toISOString();
+  notasRapidas.push({ id: uid(), texto, criado_em: agora, _sync_em: agora });
   saveNotas();
   input.value = '';
   renderNotas();
@@ -1189,8 +1457,10 @@ document.getElementById('addAnotacaoBtn').addEventListener('click', () => {
   const input = document.getElementById('novaAnotacaoInput');
   const texto = input.value.trim();
   if (!texto) return;
+  const agora = new Date().toISOString();
   currentEdit.anotacoes = currentEdit.anotacoes || [];
-  currentEdit.anotacoes.push({ texto, quando: new Date().toISOString() });
+  currentEdit.anotacoes.push({ texto, quando: agora });
+  currentEdit._sync_em = agora;
   save();
   input.value = '';
   renderAnotacoes();
@@ -1220,6 +1490,8 @@ function removerRelacionada(id){
   const rel = atividades.find(x => x.id === id);
   if (currentEdit.resposta_oficio_id === id || (rel && rel.resposta_oficio_id === currentEdit.id)) return;
   desvincularAtividades(currentEdit.id, id);
+  marcarAtividadeAlterada(currentEdit.id);
+  marcarAtividadeAlterada(id);
   save();
   renderRelacionadas();
 }
@@ -1228,6 +1500,8 @@ document.getElementById('addRelacionadaBtn').addEventListener('click', () => {
   const id = document.getElementById('novaRelacionadaSelect').value;
   if (!id) return;
   vincularAtividades(currentEdit.id, id);
+  marcarAtividadeAlterada(currentEdit.id);
+  marcarAtividadeAlterada(id);
   save();
   renderRelacionadas();
 });
@@ -1247,9 +1521,12 @@ document.getElementById('deleteBtn').addEventListener('click', function(){
   if (!confirm('Excluir esta atividade? Esta ação não pode ser desfeita.')) return;
   const idExcluido = currentEdit.id;
   const origemAnteriorId = currentEdit.resposta_oficio_id || '';
+  registrarExclusao('atividade', idExcluido);
   atividades.forEach(a => {
+    const tinhaRelacao = (a.relacionadas || []).includes(idExcluido) || a.resposta_oficio_id === idExcluido;
     a.relacionadas = (a.relacionadas || []).filter(id => id !== idExcluido);
     if (a.resposta_oficio_id === idExcluido) a.resposta_oficio_id = '';
+    if (tinhaRelacao) a._sync_em = new Date().toISOString();
   });
   atividades = atividades.filter(a => a.id !== idExcluido);
   if (origemAnteriorId) recalcularSituacaoOficioOrigem(origemAnteriorId);
@@ -1278,6 +1555,7 @@ document.getElementById('atividadeForm').addEventListener('submit', function(e){
   const anotacoes = currentEdit ? (currentEdit.anotacoes || []) : [];
   const relacionadas = currentEdit ? [...(currentEdit.relacionadas || [])] : [];
   const origemAnteriorId = currentEdit ? (currentEdit.resposta_oficio_id || '') : '';
+  const agora = new Date().toISOString();
 
   const novo = {
     id,
@@ -1305,13 +1583,14 @@ document.getElementById('atividadeForm').addEventListener('submit', function(e){
     observacoes: document.getElementById('f_observacoes').value.trim(),
     criado_em: currentEdit ? currentEdit.criado_em : todayISO(),
     atualizado_em: todayISO(),
+    _sync_em: agora,
     historico, anotacoes, relacionadas
   };
 
   if (currentEdit) {
     ['situacao','prazo_oficial','percentual','resposta_oficio_id'].forEach(campo => {
       if (String(currentEdit[campo]||'') !== String(novo[campo]||'')) {
-        novo.historico.push({ campo, de: currentEdit[campo]||'(vazio)', para: novo[campo]||'(vazio)', quando: new Date().toISOString() });
+        novo.historico.push({ campo, de: currentEdit[campo]||'(vazio)', para: novo[campo]||'(vazio)', quando: agora });
       }
     });
     atividades = atividades.map(a => a.id === id ? novo : a);
@@ -1321,9 +1600,11 @@ document.getElementById('atividadeForm').addEventListener('submit', function(e){
 
   if (origemAnteriorId && origemAnteriorId !== origemSelecionadaId) {
     desvincularAtividades(id, origemAnteriorId);
+    marcarAtividadeAlterada(origemAnteriorId);
   }
   if (origemSelecionadaId) {
     vincularAtividades(id, origemSelecionadaId);
+    marcarAtividadeAlterada(origemSelecionadaId);
     recalcularSituacaoOficioOrigem(origemSelecionadaId);
   }
   if (origemAnteriorId && origemAnteriorId !== origemSelecionadaId) {
@@ -1344,8 +1625,18 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 ['filterText','filterCategoria','filterSituacao'].forEach(id => document.getElementById(id).addEventListener('input', renderLista));
 
 document.getElementById('resetData').addEventListener('click', () => {
-  if (!confirm('Isso apaga todas as atividades salvas neste navegador. Continuar?')) return;
-  atividades = seedExemplos(); save(); renderAll();
+  if (!confirm('Isso apaga todas as atividades, inclusive dos aparelhos sincronizados. Continuar?')) return;
+  atividades.forEach(a => registrarExclusao('atividade', a.id));
+  const agora = new Date().toISOString();
+  atividades = seedExemplos().map(a => ({ ...a, _sync_em:agora })); save(); renderAll();
+});
+
+document.getElementById('syncBtn').addEventListener('click', () => {
+  if (!googleAccessToken) {
+    alert('Sua sessão Google expirou. Recarregue a página e entre novamente com o Google para sincronizar.');
+    return;
+  }
+  sincronizarDrive();
 });
 
 document.getElementById('pickDriveBtn').addEventListener('click', abrirPickerDrive);
@@ -1457,14 +1748,22 @@ document.getElementById('rep90').addEventListener('click', () => gerarRelatorioP
 document.getElementById('repAtividadeBtn').addEventListener('click', () => gerarRelatorioAtividade(document.getElementById('repAtividadeSelect').value));
 
 /* ---------- ONBOARDING ---------- */
-function entrar(nome, viaGoogle){
+async function entrar(nome, viaGoogle){
   savePerfil({ nome: nome || 'Lincoln', viaGoogle: !!viaGoogle });
   document.getElementById('userLabel').textContent = nome || 'Lincoln';
   document.getElementById('userLabel2').textContent = (nome || 'Lincoln') + (viaGoogle ? ' · conta Google' : ' · modo local');
   document.getElementById('onboarding').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   load(); loadNotas(); renderAll();
-  if (viaGoogle) { buscarAgendaGoogle(); buscarEmailsTrabalho(); }
+  const syncBtn = document.getElementById('syncBtn');
+  syncBtn.style.display = viaGoogle ? 'inline-block' : 'none';
+  if (viaGoogle) {
+    await sincronizarDrive();
+    buscarAgendaGoogle();
+    buscarEmailsTrabalho();
+  } else {
+    atualizarStatusSync('Somente neste aparelho', 'local');
+  }
 }
 
 document.getElementById('showFallback').addEventListener('click', () => {
@@ -1494,13 +1793,17 @@ document.getElementById('googleBtn').addEventListener('click', () => {
           return;
         }
         googleAccessToken = resp.access_token;
+        syncFileId = null;
+        if (!google.accounts.oauth2.hasGrantedAllScopes(resp, 'https://www.googleapis.com/auth/drive.appdata')) {
+          alert('Para sincronizar computador e celular, autorize a permissão de dados do aplicativo no Google Drive.');
+        }
         try {
           const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + googleAccessToken } });
           googleProfile = await r.json();
-          entrar(googleProfile.name || googleProfile.email || 'Usuário Google', true);
+          await entrar(googleProfile.name || googleProfile.email || 'Usuário Google', true);
         } catch (e) {
-          alert('Login concluído, mas não foi possível buscar seu perfil do Google agora. Você pode continuar em modo local.');
-          entrar('Usuário Google', true);
+          alert('Login concluído, mas não foi possível buscar seu perfil do Google agora. A sincronização ainda será tentada.');
+          await entrar('Usuário Google', true);
         }
       }
     });
@@ -1513,6 +1816,13 @@ document.getElementById('googleBtn').addEventListener('click', () => {
 document.getElementById('novoEventoBtn').addEventListener('click', abrirModalEvento);
 document.getElementById('eventoCancelBtn').addEventListener('click', fecharModalEvento);
 document.getElementById('eventModalOverlay').addEventListener('click', e => { if (e.target.id === 'eventModalOverlay') fecharModalEvento(); });
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && googleAccessToken) sincronizarDrive();
+});
+setInterval(() => {
+  if (document.visibilityState === 'visible' && googleAccessToken) sincronizarDrive();
+}, 60000);
 
 function abrirModalEvento(){
   if (!googleAccessToken) {
