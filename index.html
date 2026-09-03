@@ -87,6 +87,7 @@
   .btn { padding:8px 14px; border-radius:8px; border:1px solid var(--paper-line); background:var(--paper-card); color:var(--text); font-size:0.83rem; cursor:pointer; white-space:nowrap; }
   .btn-primary { background:var(--steel); border-color:var(--steel); color:#fff; }
   .btn-danger { color:var(--red); border-color: var(--red-soft); }
+  .urgente-ativo { background:var(--red) !important; border-color:var(--red) !important; color:#fff !important; }
   .content { padding:26px 32px 60px 32px; flex:1; }
   .view { display:none; }
   .view.active { display:block; }
@@ -293,7 +294,7 @@
       <section class="view" id="view-lista">
         <div class="section-title">Lista geral</div>
         <div class="list-toolbar">
-          <input type="text" id="filterText" placeholder="Buscar por título, processo, empresa...">
+          <input type="text" id="filterText" placeholder="Buscar por título, SILOMS/SIGAD, empresa...">
           <select id="filterCategoria"><option value="">Todas as categorias</option></select>
           <select id="filterSituacao"><option value="">Todas as situações</option></select>
         </div>
@@ -337,9 +338,13 @@
       <div class="form-grid">
         <div class="field full"><label>Título *</label><input type="text" id="f_titulo" required></div>
         <div class="field full"><label>Descrição</label><textarea id="f_descricao"></textarea></div>
+        <div class="field full">
+          <label>Urgência</label>
+          <button type="button" class="btn" id="urgenteToggle" data-active="false">Marcar como urgente</button>
+        </div>
         <div class="field"><label>Categoria *</label><select id="f_categoria" required></select></div>
         <div class="field"><label>Situação *</label><select id="f_situacao" required></select></div>
-        <div class="field"><label>Número do processo</label><input type="text" id="f_processo"></div>
+        <div class="field"><label>SILOMS/SIGAD</label><input type="text" id="f_processo"></div>
         <div class="field"><label>Número do ofício</label><input type="text" id="f_oficio"></div>
         <div class="field full"><label>Este ofício é resposta a outro já cadastrado? (opcional)</label>
           <select id="f_resposta_oficio"><option value="">Não é resposta / não se aplica</option></select>
@@ -371,6 +376,24 @@
       </div>
 
       <div class="history-list" id="historyList" style="display:none;"></div>
+
+      <div id="anotacoesBox" style="display:none;">
+        <div class="section-title" style="margin:16px 0 10px 0;">Anotações</div>
+        <div id="anotacoesList" style="margin-bottom:8px;"></div>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="novaAnotacaoInput" placeholder="Escreva uma anotação..." style="flex:1; padding:8px 10px; border-radius:7px; border:1px solid var(--paper-line); background:var(--paper); color:var(--text); font-size:0.85rem;">
+          <button type="button" class="btn" id="addAnotacaoBtn">Adicionar</button>
+        </div>
+      </div>
+
+      <div id="relacionadasBox" style="display:none;">
+        <div class="section-title" style="margin:16px 0 10px 0;">Ofícios/tarefas relacionados</div>
+        <div id="relacionadasList" style="margin-bottom:8px;"></div>
+        <div style="display:flex; gap:8px;">
+          <select id="novaRelacionadaSelect" style="flex:1; padding:8px 10px; border-radius:7px; border:1px solid var(--paper-line); background:var(--paper); color:var(--text); font-size:0.85rem;"></select>
+          <button type="button" class="btn" id="addRelacionadaBtn">Vincular</button>
+        </div>
+      </div>
 
       <div class="modal-actions">
         <div class="left"><button type="button" class="btn btn-danger" id="deleteBtn" style="display:none;">Excluir</button></div>
@@ -433,7 +456,7 @@ const PALAVRAS_TRABALHO = [
 ];
 /* ====================================================================== */
 
-const CATEGORIAS = ["Reequilíbrio econômico-financeiro","Ofício","Licitação","IPM","Processo administrativo","Reunião","E-mail","Tratativa","Demanda interna","Demanda externa","Outros"];
+const CATEGORIAS = ["Ofício","Reequilíbrio econômico-financeiro","Avaliação de conformidade","Outros"];
 const SITUACOES = ["Não iniciada","Em análise","Em elaboração","Aguardando revisão","Aguardando assinatura","Aguardando expedição","Expedido","Aguardando resposta","Respondido","Aguardando terceiro","Suspenso","Concluído","Arquivado","Vencido","A confirmar"];
 const KANBAN_BUCKETS = {
   "Não iniciada": "Não iniciada",
@@ -455,7 +478,7 @@ function seedExemplos(){
   return [
     { id: uid(), titulo:"[Exemplo] Ofício — resposta pendente à Empresa Exemplo Ltda.", descricao:"", categoria:"Ofício", situacao:"Aguardando resposta", processo:"", oficio:"0142/2026", interessado:"Empresa Exemplo Ltda.", unidade:"", responsavel:"", prioridade_manual:"", prazo_oficial: iso(-2), prazo_interno:"", percentual:0, drive:"", proxima:"Enviar reiteração de cobrança", dependencia:"", observacoes:"Dado fictício de demonstração.", criado_em: iso(-5), atualizado_em: iso(-5), data_entrada: iso(-5), historico:[] },
     { id: uid(), titulo:"[Exemplo] Parecer de reequilíbrio — Contrato Exemplo 12/2025", descricao:"", categoria:"Reequilíbrio econômico-financeiro", situacao:"Aguardando revisão", processo:"", oficio:"", interessado:"Empresa Exemplo Fictícia S.A.", unidade:"", responsavel:"", prioridade_manual:"", prazo_oficial: iso(1), prazo_interno:"", percentual:60, drive:"", proxima:"Concluir revisão do parecer", dependencia:"", observacoes:"Dado fictício de demonstração.", criado_em: iso(-3), atualizado_em: iso(-1), data_entrada: iso(-3), historico:[] },
-    { id: uid(), titulo:"[Exemplo] Pregão Exemplo nº 000/2026 sem movimentação", descricao:"", categoria:"Licitação", situacao:"Em análise", processo:"", oficio:"", interessado:"", unidade:"", responsavel:"", prioridade_manual:"", prazo_oficial:"", prazo_interno:"", percentual:30, drive:"", proxima:"Verificar documentação pendente", dependencia:"", observacoes:"Dado fictício de demonstração.", criado_em: iso(-32), atualizado_em: iso(-9), data_entrada: iso(-32), historico:[] }
+    { id: uid(), titulo:"[Exemplo] Pregão Exemplo nº 000/2026 sem movimentação", descricao:"", categoria:"Outros", situacao:"Em análise", processo:"", oficio:"", interessado:"", unidade:"", responsavel:"", prioridade_manual:"", prazo_oficial:"", prazo_interno:"", percentual:30, drive:"", proxima:"Verificar documentação pendente", dependencia:"", observacoes:"Dado fictício de demonstração.", criado_em: iso(-32), atualizado_em: iso(-9), data_entrada: iso(-32), historico:[] }
   ];
 }
 
@@ -481,13 +504,23 @@ function diffDias(dataISO){
   return Math.round((alvo - hoje) / 86400000);
 }
 
+function diasSemMovimentacao(a){
+  let ultima = a.data_entrada || a.criado_em || null;
+  (a.historico || []).forEach(h => {
+    if (h.quando && (!ultima || new Date(h.quando) > new Date(ultima))) ultima = h.quando;
+  });
+  if (!ultima) ultima = a.atualizado_em || null;
+  if (!ultima) return 0;
+  return Math.round((new Date(todayISO()) - new Date(ultima)) / 86400000);
+}
+
 function computarPrioridade(a){
   if (a.prioridade_manual) {
     return { nivel: a.prioridade_manual, justificativa: "Prioridade definida manualmente por você — o cálculo automático não é aplicado enquanto essa definição estiver ativa.", diasPrazo: diffDias(a.prazo_oficial || a.prazo_interno) };
   }
   const prazo = a.prazo_oficial || a.prazo_interno;
   const diasPrazo = diffDias(prazo);
-  const diasSemMov = a.atualizado_em ? Math.round((new Date(todayISO()) - new Date(a.atualizado_em)) / 86400000) : 0;
+  const diasSemMov = diasSemMovimentacao(a);
   const diasEntrada = a.data_entrada ? Math.round((new Date(todayISO()) - new Date(a.data_entrada)) / 86400000) : null;
 
   const rank = { "Crítica":4, "Urgente":3, "Alta":2, "Normal":1, "Baixa":0 };
@@ -500,6 +533,9 @@ function computarPrioridade(a){
 
   if (diasPrazo !== null && diasPrazo < 0) {
     considerar("Crítica", `o prazo venceu há ${Math.abs(diasPrazo)} dia(s)`);
+  }
+  if (a.urgente) {
+    considerar("Urgente", "foi marcada manualmente como urgente");
   }
   if (diasEntrada !== null && diasEntrada >= 30) {
     considerar("Crítica", `está no seu fluxo há ${diasEntrada} dias, passando do limite de 30 dias`);
@@ -575,7 +611,7 @@ function renderMeuDia(){
           <div class="badges"><span class="badge ${badgeClass(p.nivel)}">${p.nivel}</span><span class="badge">${a.categoria}</span></div>
         </div>
         <div class="p-justif">${p.justificativa}</div>
-        <div class="p-meta">${a.processo ? 'Processo '+escapeHtml(a.processo)+' · ' : ''}${a.prazo_oficial ? 'Prazo: '+fmtData(a.prazo_oficial) : 'Sem prazo cadastrado'}${(p.diasEntrada !== null && p.diasEntrada !== undefined && p.diasEntrada >= 15) ? ' · No fluxo há '+p.diasEntrada+' dias' : ''}${a.resposta_oficio_id ? ' · Resposta ao ofício: '+escapeHtml((atividades.find(x=>x.id===a.resposta_oficio_id)||{}).titulo||'') : ''}</div>
+        <div class="p-meta">${a.processo ? 'SILOMS/SIGAD '+escapeHtml(a.processo)+' · ' : ''}${a.prazo_oficial ? 'Prazo: '+fmtData(a.prazo_oficial) : 'Sem prazo cadastrado'}${(p.diasEntrada !== null && p.diasEntrada !== undefined && p.diasEntrada >= 15) ? ' · No fluxo há '+p.diasEntrada+' dias' : ''}${a.resposta_oficio_id ? ' · Resposta ao ofício: '+escapeHtml((atividades.find(x=>x.id===a.resposta_oficio_id)||{}).titulo||'') : ''}${a.urgente ? ' · <span style=\'color:var(--red); font-weight:600;\'>URGENTE</span>' : ''}</div>
       </div>
     `).join('');
   }
@@ -618,7 +654,7 @@ function renderAcompanhamento(){
 
   const parados = atividades
     .filter(a => !["Concluído","Arquivado","Respondido"].includes(a.situacao))
-    .map(a => ({ a, dias: a.atualizado_em ? Math.round((new Date(todayISO()) - new Date(a.atualizado_em)) / 86400000) : 0 }))
+    .map(a => ({ a, dias: diasSemMovimentacao(a) }))
     .filter(x => x.dias >= 7)
     .sort((x,y) => y.dias - x.dias);
   const elParados = document.getElementById('acompParados');
@@ -690,7 +726,7 @@ function renderKanban(){
         return `<div class="k-card" onclick="abrirEdicao('${a.id}')">
           <div class="k-title">${escapeHtml(a.titulo)}</div>
           ${a.prazo_oficial ? 'Prazo: '+fmtData(a.prazo_oficial) : 'Sem prazo'}
-          <div class="k-tags"><span class="badge ${badgeClass(p.nivel)}">${p.nivel}</span></div>
+          <div class="k-tags"><span class="badge ${badgeClass(p.nivel)}">${p.nivel}</span>${a.urgente ? '<span class="badge critica">URGENTE</span>' : ''}</div>
         </div>`;
       }).join('')}
     </div>
@@ -724,7 +760,7 @@ function renderLista(){
     ${filtradas.map(a => {
       const p = computarPrioridade(a);
       return `<tr class="row-clickable" onclick="abrirEdicao('${a.id}')">
-        <td>${escapeHtml(a.titulo)}</td>
+        <td>${a.urgente ? '<span style="color:var(--red); font-weight:600;">🔴 </span>' : ''}${escapeHtml(a.titulo)}</td>
         <td>${a.categoria}</td>
         <td><span class="chip badge ${badgeClass(a.situacao==='Concluído'||a.situacao==='Respondido'||a.situacao==='Arquivado' ? 'concluído' : '')}">${a.situacao}</span></td>
         <td>${a.prazo_oficial ? fmtData(a.prazo_oficial) : '—'}</td>
@@ -767,8 +803,11 @@ function abrirNovo(){
   document.getElementById('atividadeForm').reset();
   document.getElementById('f_id').value = '';
   document.getElementById('f_data_entrada').value = todayISO();
+  setUrgenteToggle(false);
   document.getElementById('deleteBtn').style.display = 'none';
   document.getElementById('historyList').style.display = 'none';
+  document.getElementById('anotacoesBox').style.display = 'none';
+  document.getElementById('relacionadasBox').style.display = 'none';
   document.getElementById('confirmBox').classList.remove('active');
   document.getElementById('modalOverlay').classList.add('active');
 }
@@ -799,6 +838,7 @@ function abrirEdicao(id){
   document.getElementById('f_dependencia').value = a.dependencia || '';
   document.getElementById('f_observacoes').value = a.observacoes || '';
   document.getElementById('f_confirm_conclusao').checked = false;
+  setUrgenteToggle(!!a.urgente);
   document.getElementById('confirmBox').classList.remove('active');
   document.getElementById('deleteBtn').style.display = 'inline-block';
   const hist = a.historico || [];
@@ -807,9 +847,77 @@ function abrirEdicao(id){
     histEl.style.display = 'block';
     histEl.innerHTML = '<strong>Histórico</strong>' + hist.slice().reverse().map(h => `<div class="history-row">${fmtData(h.quando)} — ${escapeHtml(h.campo)}: "${escapeHtml(h.de)}" → "${escapeHtml(h.para)}"</div>`).join('');
   } else { histEl.style.display = 'none'; }
+  document.getElementById('anotacoesBox').style.display = 'block';
+  document.getElementById('relacionadasBox').style.display = 'block';
+  renderAnotacoes();
+  renderRelacionadas();
   document.getElementById('modalOverlay').classList.add('active');
 }
 function fecharModal(){ document.getElementById('modalOverlay').classList.remove('active'); }
+
+function setUrgenteToggle(ativo){
+  const btn = document.getElementById('urgenteToggle');
+  btn.dataset.active = ativo ? 'true' : 'false';
+  btn.textContent = ativo ? 'Urgente ✓ (clique para desmarcar)' : 'Marcar como urgente';
+  btn.classList.toggle('urgente-ativo', ativo);
+}
+document.getElementById('urgenteToggle').addEventListener('click', () => {
+  setUrgenteToggle(document.getElementById('urgenteToggle').dataset.active !== 'true');
+});
+
+function renderAnotacoes(){
+  const el = document.getElementById('anotacoesList');
+  const lista = (currentEdit && currentEdit.anotacoes) || [];
+  if (lista.length === 0) { el.innerHTML = '<div class="panel-empty">Nenhuma anotação ainda.</div>'; return; }
+  const ordenadas = lista.slice().sort((x,y) => new Date(x.quando) - new Date(y.quando));
+  el.innerHTML = ordenadas.map(n => `<div class="history-row">${new Date(n.quando).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})} — ${escapeHtml(n.texto)}</div>`).join('');
+}
+document.getElementById('addAnotacaoBtn').addEventListener('click', () => {
+  if (!currentEdit) return;
+  const input = document.getElementById('novaAnotacaoInput');
+  const texto = input.value.trim();
+  if (!texto) return;
+  currentEdit.anotacoes = currentEdit.anotacoes || [];
+  currentEdit.anotacoes.push({ texto, quando: new Date().toISOString() });
+  save();
+  input.value = '';
+  renderAnotacoes();
+});
+
+function renderRelacionadas(){
+  const el = document.getElementById('relacionadasList');
+  const ids = (currentEdit && currentEdit.relacionadas) || [];
+  if (ids.length === 0) {
+    el.innerHTML = '<div class="panel-empty">Nenhum vínculo ainda.</div>';
+  } else {
+    el.innerHTML = ids.map(id => {
+      const rel = atividades.find(x => x.id === id);
+      if (!rel) return '';
+      return `<div class="mini-row"><span class="r-title">${escapeHtml(rel.titulo)} <span style="color:var(--text-muted);">(${escapeHtml(rel.categoria)})</span></span><span class="r-tag"><a href="#" onclick="removerRelacionada('${id}');return false;" style="color:var(--red);">remover</a></span></div>`;
+    }).join('');
+  }
+  const sel = document.getElementById('novaRelacionadaSelect');
+  const outras = atividades.filter(a => currentEdit && a.id !== currentEdit.id && !ids.includes(a.id));
+  sel.innerHTML = outras.length === 0
+    ? '<option value="">Nenhuma outra atividade cadastrada</option>'
+    : outras.map(a => `<option value="${a.id}">${escapeHtml(a.titulo)} (${escapeHtml(a.categoria)})</option>`).join('');
+}
+function removerRelacionada(id){
+  if (!currentEdit) return;
+  currentEdit.relacionadas = (currentEdit.relacionadas || []).filter(x => x !== id);
+  save();
+  renderRelacionadas();
+}
+document.getElementById('addRelacionadaBtn').addEventListener('click', () => {
+  if (!currentEdit) return;
+  const id = document.getElementById('novaRelacionadaSelect').value;
+  if (!id) return;
+  currentEdit.relacionadas = currentEdit.relacionadas || [];
+  if (!currentEdit.relacionadas.includes(id)) currentEdit.relacionadas.push(id);
+  save();
+  renderRelacionadas();
+});
+
 
 document.getElementById('newBtn').addEventListener('click', abrirNovo);
 document.getElementById('cancelBtn').addEventListener('click', fecharModal);
@@ -837,11 +945,14 @@ document.getElementById('atividadeForm').addEventListener('submit', function(e){
   const id = document.getElementById('f_id').value || uid();
   const isNew = !document.getElementById('f_id').value;
   const historico = currentEdit ? (currentEdit.historico || []) : [];
+  const anotacoes = currentEdit ? (currentEdit.anotacoes || []) : [];
+  const relacionadas = currentEdit ? (currentEdit.relacionadas || []) : [];
 
   const novo = {
     id,
     titulo: document.getElementById('f_titulo').value.trim(),
     descricao: document.getElementById('f_descricao').value.trim(),
+    urgente: document.getElementById('urgenteToggle').dataset.active === 'true',
     categoria: document.getElementById('f_categoria').value,
     situacao: situacao,
     processo: document.getElementById('f_processo').value.trim(),
@@ -861,7 +972,7 @@ document.getElementById('atividadeForm').addEventListener('submit', function(e){
     observacoes: document.getElementById('f_observacoes').value.trim(),
     criado_em: currentEdit ? currentEdit.criado_em : todayISO(),
     atualizado_em: todayISO(),
-    historico
+    historico, anotacoes, relacionadas
   };
 
   if (currentEdit) {
@@ -958,7 +1069,7 @@ function baixarArquivo(nome, conteudo, tipo){
 
 function gerarRelatorioPeriodo(dias){
   const limite = new Date(); limite.setDate(limite.getDate() - dias);
-  const linhas = [['Título','Categoria','Situação','Processo','Ofício','Prazo oficial','% Conclusão','Criado em','Atualizado em','Campo alterado','De','Para','Data da alteração']];
+  const linhas = [['Título','Categoria','Situação','SILOMS/SIGAD','Ofício','Prazo oficial','% Conclusão','Criado em','Atualizado em','Campo alterado','De','Para','Data da alteração']];
   atividades.forEach(a => {
     const dentroDoPeriodo = (a.atualizado_em && new Date(a.atualizado_em) >= limite) || (a.criado_em && new Date(a.criado_em) >= limite);
     const hist = (a.historico || []).filter(h => h.quando && new Date(h.quando) >= limite);
@@ -981,7 +1092,7 @@ function gerarRelatorioAtividade(id){
   const linhas = [['Campo','Valor']];
   Object.entries({
     'Título': a.titulo, 'Descrição': a.descricao, 'Categoria': a.categoria, 'Situação': a.situacao,
-    'Processo': a.processo, 'Ofício': a.oficio, 'Resposta ao ofício': (atividades.find(x=>x.id===a.resposta_oficio_id)||{}).titulo || '',
+    'SILOMS/SIGAD': a.processo, 'Ofício': a.oficio, 'Resposta ao ofício': (atividades.find(x=>x.id===a.resposta_oficio_id)||{}).titulo || '',
     'Interessado/Empresa': a.interessado, 'Unidade': a.unidade, 'Responsável': a.responsavel,
     'Prazo oficial': a.prazo_oficial, 'Prazo interno': a.prazo_interno, '% Conclusão': a.percentual,
     'Link do Drive': a.drive, 'Próxima providência': a.proxima, 'Dependência': a.dependencia,
