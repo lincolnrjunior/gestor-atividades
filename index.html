@@ -316,6 +316,15 @@
         <div class="section-title">Central de alertas</div>
         <div id="centralAlertas"></div>
 
+        <div class="section-title">Diário de bordo</div>
+        <div class="panel" style="max-height:none;">
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <input type="time" id="diarioHoraInput" style="width:110px; padding:8px 10px; border-radius:7px; border:1px solid var(--paper-line); background:var(--paper); color:var(--text); font-size:0.85rem;">
+            <input type="text" id="diarioTextoInput" placeholder="O que está acontecendo agora?" style="flex:1; min-width:180px; padding:8px 10px; border-radius:7px; border:1px solid var(--paper-line); background:var(--paper); color:var(--text); font-size:0.85rem;">
+            <button type="button" class="btn-xs" id="addDiarioBtn">Registrar</button>
+          </div>
+        </div>
+
         <div class="section-title">Agenda e notas</div>
         <div class="two-col">
           <div class="panel">
@@ -330,16 +339,6 @@
             </div>
             <div id="notasBoard" class="notas-board"></div>
           </div>
-        </div>
-
-        <div class="section-title">Diário de bordo</div>
-        <div class="panel" style="max-height:none;">
-          <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
-            <input type="time" id="diarioHoraInput" style="width:110px; padding:8px 10px; border-radius:7px; border:1px solid var(--paper-line); background:var(--paper); color:var(--text); font-size:0.85rem;">
-            <input type="text" id="diarioTextoInput" placeholder="O que está acontecendo agora?" style="flex:1; min-width:180px; padding:8px 10px; border-radius:7px; border:1px solid var(--paper-line); background:var(--paper); color:var(--text); font-size:0.85rem;">
-            <button type="button" class="btn-xs" id="addDiarioBtn">Registrar</button>
-          </div>
-          <div id="diarioHojeList"></div>
         </div>
 
         <div class="section-title">Prioridades de hoje</div>
@@ -1105,7 +1104,6 @@ function renderMeuDia(){
   renderNotas();
   renderEmailsTrabalho();
   renderCentralAlertas();
-  renderDiarioHoje();
   renderDiarioCompleto();
 }
 
@@ -1190,15 +1188,6 @@ function saveDiario(){
 }
 function horaAtualHHMM(){ return new Date().toTimeString().slice(0,5); }
 
-function renderDiarioHoje(){
-  const el = document.getElementById('diarioHojeList');
-  if (!el) return;
-  const hoje = diarioBordo.filter(d => d.data === todayISO()).slice().sort((a,b) => (a.hora||'').localeCompare(b.hora||''));
-  el.innerHTML = hoje.length === 0
-    ? '<div class="panel-empty">Nada registrado ainda hoje.</div>'
-    : hoje.map(d => `<div class="mini-row"><span class="r-title">${escapeHtml(d.hora||'')} — ${escapeHtml(d.texto)}</span><span class="r-tag"><a href="#" onclick="removerDiario('${d.id}');return false;" style="color:var(--red);">remover</a></span></div>`).join('');
-}
-
 function renderDiarioCompleto(){
   const el = document.getElementById('diarioCompleto');
   if (!el) return;
@@ -1222,7 +1211,6 @@ function removerDiario(id){
   registrarExclusao('diario', id);
   diarioBordo = diarioBordo.filter(d => d.id !== id);
   saveDiario();
-  renderDiarioHoje();
   renderDiarioCompleto();
 }
 
@@ -1237,12 +1225,12 @@ document.getElementById('addDiarioBtn').addEventListener('click', () => {
   saveDiario();
   textoEl.value = '';
   horaEl.value = horaAtualHHMM();
-  renderDiarioHoje();
   renderDiarioCompleto();
 });
 document.getElementById('diarioTextoInput').addEventListener('keydown', function(e){
   if (e.key === 'Enter') { e.preventDefault(); document.getElementById('addDiarioBtn').click(); }
 });
+
 
 function renderEmailsTrabalho(){
   const box = document.getElementById('emailsTrabalhoBox');
