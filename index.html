@@ -84,6 +84,9 @@
   main { flex:1; min-width:0; display:flex; flex-direction:column; }
   .topbar { padding:20px 32px 16px 32px; display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid var(--paper-line); flex-wrap:wrap; }
   .topbar .who { font-size:0.82rem; color:var(--text-muted); }
+  .mobile-nav { display:none; flex:0 0 auto; flex-direction:row; }
+  .mobile-nav-item { min-height:44px; padding:8px 12px; border:0; border-bottom:3px solid transparent; background:transparent; color:var(--text-muted); font-size:0.8rem; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .mobile-nav-item.active { color:var(--steel); border-bottom-color:var(--steel); }
   .btn { padding:8px 14px; border-radius:8px; border:1px solid var(--paper-line); background:var(--paper-card); color:var(--text); font-size:0.83rem; cursor:pointer; white-space:nowrap; }
   .btn-primary { background:var(--steel); border-color:var(--steel); color:#fff; }
   .btn-danger { color:var(--red); border-color: var(--red-soft); }
@@ -220,14 +223,45 @@
 
   @media (max-width: 900px) {
     .sidebar { display:none; }
+    .app, main { width:100%; min-width:0; }
+    .mobile-nav { display:flex; align-items:stretch; gap:2px; overflow-x:auto; padding:0 8px; background:var(--paper-card); border-bottom:1px solid var(--paper-line); position:sticky; top:0; z-index:20; scrollbar-width:none; }
+    .mobile-nav::-webkit-scrollbar { display:none; }
     .content { padding:18px 16px 50px 16px; }
     .topbar { padding:16px; }
+    .btn, .btn-xs, button { min-height:44px; }
+    .field input, .field select, .field textarea, .list-toolbar input, .list-toolbar select, .report-row select { font-size:16px; }
+    .list-toolbar > * { width:100%; min-width:0; }
+    .report-row select { width:100%; min-width:0; }
+    #listWrap table, #listWrap tbody, #listWrap tr, #listWrap td { display:block; width:100%; }
+    #listWrap table { border:0; background:transparent; }
+    #listWrap thead { display:none; }
+    #listWrap tr { margin-bottom:12px; border:1px solid var(--paper-line); border-radius:10px; overflow:hidden; background:var(--paper-card); }
+    #listWrap td { display:grid; grid-template-columns:minmax(92px, 36%) 1fr; gap:10px; align-items:center; padding:10px 12px; border-bottom:1px solid var(--paper-line); overflow-wrap:anywhere; }
+    #listWrap td:last-child { border-bottom:0; }
+    #listWrap td::before { content:attr(data-label); color:var(--text-muted); font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.02em; }
     .deadline-strip { grid-template-columns:repeat(3,1fr); }
     .kanban { grid-template-columns:1fr; }
     .form-grid { grid-template-columns:1fr; }
     .detail-grid { grid-template-columns:1fr; }
     .detail-field.full { grid-column:auto; }
     .two-col { grid-template-columns:1fr; }
+    .panel { max-height:none; }
+    .modal-overlay { align-items:flex-end; padding:0; }
+    .modal { width:100%; max-width:none; max-height:100dvh; border-radius:14px 14px 0 0; padding:20px 16px; }
+    .detail-head { gap:10px; }
+    .detail-related { align-items:flex-start; }
+  }
+  @media (max-width: 480px) {
+    .topbar { align-items:stretch; }
+    .topbar .who { width:100%; }
+    .topbar #newBtn { width:100%; }
+    .content { padding:16px 12px 44px 12px; }
+    .greeting h1 { font-size:1.35rem; }
+    .deadline-strip { grid-template-columns:repeat(2,1fr); }
+    .modal-actions { align-items:stretch; flex-wrap:wrap; }
+    .modal-actions .left, .modal-actions .right { width:100%; }
+    .modal-actions .right { display:grid; grid-template-columns:1fr 1fr; }
+    .detail-head h2 { font-size:1.15rem; }
   }
 </style>
 </head>
@@ -275,6 +309,12 @@
       <div class="who">Sessão local · <span id="userLabel2">Lincoln Junior</span></div>
       <button class="btn btn-primary" id="newBtn">+ Cadastrar atividade</button>
     </div>
+    <nav class="mobile-nav" aria-label="Navegação principal no celular">
+      <button class="mobile-nav-item active" data-view="meudia">Home</button>
+      <button class="mobile-nav-item" data-view="kanban">Kanban</button>
+      <button class="mobile-nav-item" data-view="lista">Lista geral</button>
+      <button class="mobile-nav-item" data-view="relatorios">Relatórios</button>
+    </nav>
     <div class="content">
 
       <!-- HOME -->
@@ -931,11 +971,11 @@ function renderLista(){
     ${filtradas.map(a => {
       const p = computarPrioridade(a);
       return `<tr class="row-clickable" onclick="abrirDetalhes('${a.id}')">
-        <td>${a.urgente ? '<span style="color:var(--red); font-weight:600;">🔴 </span>' : ''}${escapeHtml(a.titulo)}</td>
-        <td>${a.categoria}</td>
-        <td><span class="chip badge ${badgeClass(a.situacao==='Concluído'||a.situacao==='Respondido'||a.situacao==='Arquivado' ? 'concluído' : '')}">${a.situacao}</span></td>
-        <td>${a.prazo_oficial ? fmtData(a.prazo_oficial) : '—'}</td>
-        <td><span class="badge ${badgeClass(p.nivel)}">${p.nivel}</span></td>
+        <td data-label="Título">${a.urgente ? '<span style="color:var(--red); font-weight:600;">🔴 </span>' : ''}${escapeHtml(a.titulo)}</td>
+        <td data-label="Categoria">${a.categoria}</td>
+        <td data-label="Situação"><span class="chip badge ${badgeClass(a.situacao==='Concluído'||a.situacao==='Respondido'||a.situacao==='Arquivado' ? 'concluído' : '')}">${a.situacao}</span></td>
+        <td data-label="Prazo">${a.prazo_oficial ? fmtData(a.prazo_oficial) : '—'}</td>
+        <td data-label="Prioridade"><span class="badge ${badgeClass(p.nivel)}">${p.nivel}</span></td>
       </tr>`;
     }).join('')}
   </tbody></table>`;
@@ -1333,10 +1373,10 @@ document.getElementById('atividadeForm').addEventListener('submit', function(e){
   save(); renderAll(); fecharModal();
 });
 
-document.querySelectorAll('.nav-item').forEach(btn => {
+document.querySelectorAll('.nav-item, .mobile-nav-item').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+    document.querySelectorAll('.nav-item, .mobile-nav-item').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll(`.nav-item[data-view="${btn.dataset.view}"], .mobile-nav-item[data-view="${btn.dataset.view}"]`).forEach(b => b.classList.add('active'));
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-' + btn.dataset.view).classList.add('active');
   });
