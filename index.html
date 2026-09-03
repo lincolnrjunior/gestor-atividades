@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gestor de Atividades — Lincoln Junior (integrado ao Google)</title>
+<title>Agenda | Lincoln Junior</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -110,6 +110,19 @@
   .mini-row .r-title { color:var(--text); }
   .mini-row .r-tag { color:var(--text-muted); font-size:0.74rem; white-space:nowrap; }
   .panel-empty { font-size:0.8rem; color:var(--text-muted); padding:4px 0; }
+
+  .notas-board { display:flex; flex-wrap:wrap; gap:10px; }
+  .postit {
+    background:#FCE9A8; border-radius:4px; padding:10px 10px 8px 10px; width:120px; min-height:84px;
+    box-shadow:0 2px 6px rgba(0,0,0,0.15); font-size:0.78rem; display:flex; flex-direction:column;
+    justify-content:space-between; transform:rotate(-1.5deg); flex-shrink:0;
+  }
+  .postit:nth-child(even) { transform:rotate(1.4deg); background:#FDE1A8; }
+  .postit:nth-child(3n) { transform:rotate(-0.6deg); background:#FBD9EA; }
+  .postit:nth-child(4n) { transform:rotate(0.8deg); background:#D8ECFB; }
+  .postit .txt { color:#2E2410; word-break:break-word; white-space:pre-wrap; line-height:1.35; }
+  .postit .rm { align-self:flex-end; background:none; border:none; cursor:pointer; color:#6b5a1f; font-size:0.85rem; padding:2px 4px; margin-top:6px; }
+  .postit .rm:hover { color:var(--red); }
 
   .alert-card { display:flex; gap:11px; background:var(--paper-card); border:1px solid var(--paper-line); border-radius:10px; padding:12px 14px; margin-bottom:8px; align-items:flex-start; }
   .alert-dot { width:9px; height:9px; border-radius:50%; margin-top:5px; flex-shrink:0; }
@@ -250,24 +263,25 @@
       <section class="view active" id="view-meudia">
         <div class="greeting">
           <div class="kicker" id="dataExtenso"></div>
-          <h1 class="serif" id="greetingText">Bom dia. Estas são as atividades que iremos priorizar hoje.</h1>
+          <h1 class="serif" id="greetingText">Bom dia.</h1>
         </div>
 
         <div class="section-title">Central de alertas</div>
         <div id="centralAlertas"></div>
 
-        <div class="section-title">Agenda e acompanhamento</div>
+        <div class="section-title">Agenda e notas</div>
         <div class="two-col">
           <div class="panel">
             <h3>Agenda Google <button type="button" class="btn-xs" id="novoEventoBtn">+ Novo compromisso</button></h3>
             <div id="agendaBox" class="panel-empty">Conecte sua conta Google para trazer seus próximos compromissos aqui.</div>
           </div>
           <div class="panel">
-            <h3>Acompanhamento</h3>
-            <div class="panel-sub">Ofícios aguardando resposta</div>
-            <div id="acompOficios"></div>
-            <div class="panel-sub">Sem movimentação há vários dias</div>
-            <div id="acompParados"></div>
+            <h3>Notas rápidas</h3>
+            <div style="display:flex; gap:8px; margin-bottom:10px;">
+              <input type="text" id="novaNotaInput" placeholder="Escreva uma nota..." style="flex:1; padding:8px 10px; border-radius:7px; border:1px solid var(--paper-line); background:var(--paper); color:var(--text); font-size:0.85rem;">
+              <button type="button" class="btn-xs" id="addNotaBtn">Adicionar</button>
+            </div>
+            <div id="notasBoard" class="notas-board"></div>
           </div>
         </div>
 
@@ -588,7 +602,7 @@ function dataPorExtenso(){
 /* ---------- RENDER: MEU DIA ---------- */
 function renderMeuDia(){
   const nome = (loadPerfil()||{}).nome || "Lincoln";
-  document.getElementById('greetingText').textContent = `${saudacaoPorTurno()}, ${nome}. Estas são as atividades que iremos priorizar hoje.`;
+  document.getElementById('greetingText').textContent = `${saudacaoPorTurno()}, ${nome}!`;
   const dataEl = document.getElementById('dataExtenso');
   if (dataEl) dataEl.textContent = dataPorExtenso();
 
@@ -636,32 +650,52 @@ function renderMeuDia(){
     <div class="dl-chip"><div class="n">${buckets.d30}</div><div class="l">30 dias</div></div>
   `;
 
-  renderAcompanhamento();
+  renderNotas();
   renderEmailsTrabalho();
   renderCentralAlertas();
 }
 
-function renderAcompanhamento(){
-  const oficiosAguardando = atividades.filter(a => a.categoria === 'Ofício' && a.situacao === 'Aguardando resposta');
-  const elOf = document.getElementById('acompOficios');
-  elOf.innerHTML = oficiosAguardando.length === 0
-    ? '<div class="panel-empty">Nenhum ofício aguardando resposta.</div>'
-    : oficiosAguardando.map(a => {
-        const dp = diffDias(a.prazo_oficial || a.prazo_interno);
-        const tag = dp === null ? 'Sem prazo' : (dp < 0 ? `Vencido há ${Math.abs(dp)}d` : `Vence em ${dp}d`);
-        return `<div class="mini-row"><span class="r-title">${escapeHtml(a.titulo)}</span><span class="r-tag">${tag}</span></div>`;
-      }).join('');
-
-  const parados = atividades
-    .filter(a => !["Concluído","Arquivado","Respondido"].includes(a.situacao))
-    .map(a => ({ a, dias: diasSemMovimentacao(a) }))
-    .filter(x => x.dias >= 7)
-    .sort((x,y) => y.dias - x.dias);
-  const elParados = document.getElementById('acompParados');
-  elParados.innerHTML = parados.length === 0
-    ? '<div class="panel-empty">Nada parado há mais de 7 dias.</div>'
-    : parados.map(({a,dias}) => `<div class="mini-row"><span class="r-title">${escapeHtml(a.titulo)}</span><span class="r-tag">${dias} dias parado</span></div>`).join('');
+let notasRapidas = [];
+function loadNotas(){
+  try {
+    const raw = localStorage.getItem('gestor_notas_v1');
+    notasRapidas = raw ? JSON.parse(raw) : [];
+  } catch(e) { notasRapidas = []; }
 }
+function saveNotas(){
+  try { localStorage.setItem('gestor_notas_v1', JSON.stringify(notasRapidas)); } catch(e) { console.error('Falha ao salvar notas', e); }
+}
+function renderNotas(){
+  const board = document.getElementById('notasBoard');
+  if (!board) return;
+  if (notasRapidas.length === 0) {
+    board.innerHTML = '<div class="panel-empty">Nenhuma nota ainda.</div>';
+    return;
+  }
+  board.innerHTML = notasRapidas.slice().reverse().map(n => `
+    <div class="postit">
+      <div class="txt">${escapeHtml(n.texto)}</div>
+      <button type="button" class="rm" title="Apagar nota" onclick="removerNota('${n.id}')">✕</button>
+    </div>
+  `).join('');
+}
+function removerNota(id){
+  notasRapidas = notasRapidas.filter(n => n.id !== id);
+  saveNotas();
+  renderNotas();
+}
+document.getElementById('addNotaBtn').addEventListener('click', () => {
+  const input = document.getElementById('novaNotaInput');
+  const texto = input.value.trim();
+  if (!texto) return;
+  notasRapidas.push({ id: uid(), texto, criado_em: new Date().toISOString() });
+  saveNotas();
+  input.value = '';
+  renderNotas();
+});
+document.getElementById('novaNotaInput').addEventListener('keydown', function(e){
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('addNotaBtn').click(); }
+});
 
 function renderEmailsTrabalho(){
   const box = document.getElementById('emailsTrabalhoBox');
@@ -1118,7 +1152,7 @@ function entrar(nome, viaGoogle){
   document.getElementById('userLabel2').textContent = (nome || 'Lincoln') + (viaGoogle ? ' · conta Google' : ' · modo local');
   document.getElementById('onboarding').style.display = 'none';
   document.getElementById('app').style.display = 'block';
-  load(); renderAll();
+  load(); loadNotas(); renderAll();
   if (viaGoogle) { buscarAgendaGoogle(); buscarEmailsTrabalho(); }
 }
 
