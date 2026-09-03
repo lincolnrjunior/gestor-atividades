@@ -83,7 +83,7 @@
 
   main { flex:1; min-width:0; display:flex; flex-direction:column; }
   .topbar { padding:20px 32px 16px 32px; display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid var(--paper-line); flex-wrap:wrap; }
-  .topbar .who { font-size:0.82rem; color:var(--text-muted); }
+  .topbar .who { font-size:0.82rem; color:var(--text-muted); display:flex; align-items:center; gap:10px; }
   .topbar-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
   .sync-status { font-size:0.74rem; color:var(--text-muted); }
   .sync-status[data-state="ok"] { color:var(--green); }
@@ -94,6 +94,8 @@
   .btn-danger { color:var(--red); border-color: var(--red-soft); }
   .urgente-ativo { background:var(--red) !important; border-color:var(--red) !important; color:#fff !important; }
   .ativo-azul { background:var(--steel) !important; border-color:var(--steel) !important; color:#fff !important; }
+  .menu-toggle { display:none; background:var(--paper-card); border:1px solid var(--paper-line); border-radius:8px; padding:8px 12px; cursor:pointer; color:var(--text); font-size:1rem; line-height:1; }
+  .sidebar-backdrop { display:none; }
   .content { padding:26px 32px 60px 32px; flex:1; }
   .view { display:none; }
   .view.active { display:block; }
@@ -126,9 +128,13 @@
   .postit:nth-child(even) { transform:rotate(1.4deg); background:#FDE1A8; }
   .postit:nth-child(3n) { transform:rotate(-0.6deg); background:#FBD9EA; }
   .postit:nth-child(4n) { transform:rotate(0.8deg); background:#D8ECFB; }
+  .postit.cumprida { opacity:0.6; }
+  .postit.cumprida .txt { text-decoration:line-through; }
   .postit .txt { color:#2E2410; word-break:break-word; white-space:pre-wrap; line-height:1.35; }
-  .postit .rm { align-self:flex-end; background:none; border:none; cursor:pointer; color:#6b5a1f; font-size:0.85rem; padding:2px 4px; margin-top:6px; }
+  .postit .postit-actions { display:flex; justify-content:space-between; align-items:center; margin-top:6px; }
+  .postit .rm { background:none; border:none; cursor:pointer; color:#6b5a1f; font-size:0.85rem; padding:2px 4px; }
   .postit .rm:hover { color:var(--red); }
+  .postit .ok { background:none; border:none; cursor:pointer; color:#3A7355; font-size:0.9rem; padding:2px 4px; }
 
   .alert-card { display:flex; gap:11px; background:var(--paper-card); border:1px solid var(--paper-line); border-radius:10px; padding:12px 14px; margin-bottom:8px; align-items:flex-start; }
   .alert-dot { width:9px; height:9px; border-radius:50%; margin-top:5px; flex-shrink:0; }
@@ -223,8 +229,17 @@
   .detail-related-meta { color:var(--text-muted); font-size:0.75rem; margin-top:2px; }
   .detail-related-arrow { color:var(--steel); font-size:1rem; }
 
+  .diario-day { margin-bottom:14px; }
+  .diario-day h3 { font-size:0.86rem; margin:0 0 8px 0; font-weight:600; }
+
   @media (max-width: 900px) {
-    .sidebar { display:none; }
+    .menu-toggle { display:inline-flex; align-items:center; justify-content:center; }
+    .sidebar {
+      display:flex; position:fixed; top:0; left:0; bottom:0; width:250px; z-index:70;
+      transform:translateX(-100%); transition:transform 0.22s ease; box-shadow:6px 0 24px rgba(0,0,0,0.3);
+    }
+    .sidebar.open { transform:translateX(0); }
+    .sidebar-backdrop.active { display:block; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:65; }
     .content { padding:18px 16px 50px 16px; }
     .topbar { padding:16px; }
     .deadline-strip { grid-template-columns:repeat(3,1fr); }
@@ -262,24 +277,27 @@
 <!-- APP -->
 <div id="app">
 <div class="app">
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
   <aside class="sidebar">
     <div class="brand"><div class="mark">Demandas</div><div class="sub" id="userLabel">Lincoln Junior</div></div>
     <nav id="nav">
       <button class="nav-item active" data-view="meudia">Home</button>
       <button class="nav-item" data-view="kanban">Quadro Kanban</button>
       <button class="nav-item" data-view="lista">Lista geral<span class="badgecount" id="countTotal">0</span></button>
+      <button class="nav-item" data-view="diario">Diário de bordo</button>
       <button class="nav-item" data-view="relatorios">Relatórios</button>
     </nav>
     <div class="sidebar-foot">
-      Atividades salvas localmente neste navegador. Login, Agenda de hoje e vínculo de arquivos do Drive vêm da sua conta Google real quando conectada; Gmail, ofícios detalhados e alertas automáticos ainda são etapas seguintes do plano.
-      Com a conta Google conectada, uma cópia sincronizada das atividades e notas também é mantida no Google Drive para uso no computador e no celular.
       <button id="resetData">Limpar todos os dados</button>
     </div>
   </aside>
 
   <main>
     <div class="topbar">
-      <div class="who">Sessão local · <span id="userLabel2">Lincoln Junior</span></div>
+      <div class="who">
+        <button type="button" class="menu-toggle" id="menuToggleBtn" aria-label="Abrir menu">☰</button>
+        Sessão local · <span id="userLabel2">Lincoln Junior</span>
+      </div>
       <div class="topbar-actions">
         <span class="sync-status" id="syncStatus" data-state="local" aria-live="polite">Somente neste aparelho</span>
         <button class="btn" id="syncBtn" type="button" style="display:none;">Sincronizar agora</button>
@@ -305,13 +323,23 @@
             <div id="agendaBox" class="panel-empty">Conecte sua conta Google para trazer seus próximos compromissos aqui.</div>
           </div>
           <div class="panel">
-            <h3>Notas rápidas</h3>
+            <h3>Notas rápidas <span style="display:flex; gap:4px;"><button type="button" class="btn-xs ativo-azul" id="notasTabPendentes">Pendentes</button><button type="button" class="btn-xs" id="notasTabCumpridas">Cumpridas</button></span></h3>
             <div style="display:flex; gap:8px; margin-bottom:10px;">
               <input type="text" id="novaNotaInput" placeholder="Escreva uma nota..." style="flex:1; padding:8px 10px; border-radius:7px; border:1px solid var(--paper-line); background:var(--paper); color:var(--text); font-size:0.85rem;">
               <button type="button" class="btn-xs" id="addNotaBtn">Adicionar</button>
             </div>
             <div id="notasBoard" class="notas-board"></div>
           </div>
+        </div>
+
+        <div class="section-title">Diário de bordo</div>
+        <div class="panel" style="max-height:none;">
+          <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+            <input type="time" id="diarioHoraInput" style="width:110px; padding:8px 10px; border-radius:7px; border:1px solid var(--paper-line); background:var(--paper); color:var(--text); font-size:0.85rem;">
+            <input type="text" id="diarioTextoInput" placeholder="O que está acontecendo agora?" style="flex:1; min-width:180px; padding:8px 10px; border-radius:7px; border:1px solid var(--paper-line); background:var(--paper); color:var(--text); font-size:0.85rem;">
+            <button type="button" class="btn-xs" id="addDiarioBtn">Registrar</button>
+          </div>
+          <div id="diarioHojeList"></div>
         </div>
 
         <div class="section-title">Prioridades de hoje</div>
@@ -342,6 +370,12 @@
           <select id="filterSituacao"><option value="">Todas as situações</option></select>
         </div>
         <div id="listWrap"></div>
+      </section>
+
+      <!-- DIÁRIO DE BORDO -->
+      <section class="view" id="view-diario">
+        <div class="section-title">Diário de bordo — histórico completo</div>
+        <div id="diarioCompleto"></div>
       </section>
 
       <!-- RELATÓRIOS -->
@@ -558,7 +592,7 @@ const KANBAN_ORDER = ["Não iniciada","Em andamento","Aguardando terceiro","Susp
 let atividades = [];
 let currentEdit = null;
 let currentDetailId = null;
-let syncMeta = { updatedAt:'', deletedAtividades:{}, deletedNotas:{} };
+let syncMeta = { updatedAt:'', deletedAtividades:{}, deletedNotas:{}, deletedDiario:{} };
 
 function uid(){ return 'a_' + Date.now() + '_' + Math.random().toString(36).slice(2,7); }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
@@ -649,10 +683,11 @@ function carregarMetaSync(){
     return {
       updatedAt: meta.updatedAt || '',
       deletedAtividades: meta.deletedAtividades || {},
-      deletedNotas: meta.deletedNotas || {}
+      deletedNotas: meta.deletedNotas || {},
+      deletedDiario: meta.deletedDiario || {}
     };
   } catch(e) {
-    return { updatedAt:'', deletedAtividades:{}, deletedNotas:{} };
+    return { updatedAt:'', deletedAtividades:{}, deletedNotas:{}, deletedDiario:{} };
   }
 }
 
@@ -664,6 +699,11 @@ function salvarAtividadesLocal(){
 function salvarNotasLocal(){
   try { localStorage.setItem('gestor_notas_v1', JSON.stringify(notasRapidas)); }
   catch(e) { console.error('Falha ao salvar notas localmente', e); }
+}
+
+function salvarDiarioLocal(){
+  try { localStorage.setItem('gestor_diario_v1', JSON.stringify(diarioBordo)); }
+  catch(e) { console.error('Falha ao salvar diário localmente', e); }
 }
 
 function salvarMetaSync(){
@@ -691,7 +731,7 @@ function marcarAtividadeAlterada(id){
 }
 
 function registrarExclusao(tipo, id){
-  const mapa = tipo === 'nota' ? syncMeta.deletedNotas : syncMeta.deletedAtividades;
+  const mapa = tipo === 'nota' ? syncMeta.deletedNotas : tipo === 'diario' ? syncMeta.deletedDiario : syncMeta.deletedAtividades;
   mapa[id] = new Date().toISOString();
 }
 
@@ -745,14 +785,17 @@ function estadoLocalSync(){
     updatedAt: syncMeta.updatedAt || '',
     atividades,
     notasRapidas,
+    diarioBordo,
     deletedAtividades: syncMeta.deletedAtividades,
-    deletedNotas: syncMeta.deletedNotas
+    deletedNotas: syncMeta.deletedNotas,
+    deletedDiario: syncMeta.deletedDiario
   };
 }
 
 function mesclarEstados(local, remoto){
   const deletedAtividades = mesclarExclusoes(local.deletedAtividades, remoto.deletedAtividades);
   const deletedNotas = mesclarExclusoes(local.deletedNotas, remoto.deletedNotas);
+  const deletedDiario = mesclarExclusoes(local.deletedDiario, remoto.deletedDiario);
   const locaisSemExemplosDuplicados = remoto.updatedAt && !local.updatedAt
     ? (local.atividades || []).filter(a => !String(a.titulo || '').startsWith('[Exemplo]'))
     : (local.atividades || []);
@@ -761,8 +804,10 @@ function mesclarEstados(local, remoto){
     updatedAt: new Date().toISOString(),
     atividades: mesclarRegistros(locaisSemExemplosDuplicados, remoto.atividades || [], deletedAtividades),
     notasRapidas: mesclarRegistros(local.notasRapidas || [], remoto.notasRapidas || [], deletedNotas),
+    diarioBordo: mesclarRegistros(local.diarioBordo || [], remoto.diarioBordo || [], deletedDiario),
     deletedAtividades,
-    deletedNotas
+    deletedNotas,
+    deletedDiario
   };
 }
 
@@ -772,8 +817,10 @@ function estadoComparavel(estado){
   return JSON.stringify({
     atividades: ordenar(estado.atividades),
     notasRapidas: ordenar(estado.notasRapidas),
+    diarioBordo: ordenar(estado.diarioBordo),
     deletedAtividades: ordenarMapa(estado.deletedAtividades),
-    deletedNotas: ordenarMapa(estado.deletedNotas)
+    deletedNotas: ordenarMapa(estado.deletedNotas),
+    deletedDiario: ordenarMapa(estado.deletedDiario)
   });
 }
 
@@ -781,15 +828,18 @@ function aplicarEstadoSync(estado){
   const editId = currentEdit && currentEdit.id;
   atividades = Array.isArray(estado.atividades) ? estado.atividades : [];
   notasRapidas = Array.isArray(estado.notasRapidas) ? estado.notasRapidas : [];
+  diarioBordo = Array.isArray(estado.diarioBordo) ? estado.diarioBordo : [];
   syncMeta = {
     updatedAt: estado.updatedAt || new Date().toISOString(),
     deletedAtividades: estado.deletedAtividades || {},
-    deletedNotas: estado.deletedNotas || {}
+    deletedNotas: estado.deletedNotas || {},
+    deletedDiario: estado.deletedDiario || {}
   };
   normalizarVinculosCarregados();
   currentEdit = editId ? (atividades.find(a => a.id === editId) || null) : null;
   salvarAtividadesLocal();
   salvarNotasLocal();
+  salvarDiarioLocal();
   salvarMetaSync();
 }
 
@@ -1055,9 +1105,12 @@ function renderMeuDia(){
   renderNotas();
   renderEmailsTrabalho();
   renderCentralAlertas();
+  renderDiarioHoje();
+  renderDiarioCompleto();
 }
 
 let notasRapidas = [];
+let notasAbaAtiva = 'pendentes';
 function loadNotas(){
   try {
     const raw = localStorage.getItem('gestor_notas_v1');
@@ -1068,19 +1121,41 @@ function saveNotas(){
   salvarNotasLocal();
   registrarAlteracaoLocal();
 }
+function setNotasAba(aba){
+  notasAbaAtiva = aba;
+  document.getElementById('notasTabPendentes').classList.toggle('ativo-azul', aba === 'pendentes');
+  document.getElementById('notasTabCumpridas').classList.toggle('ativo-azul', aba === 'cumpridas');
+  renderNotas();
+}
+document.getElementById('notasTabPendentes').addEventListener('click', () => setNotasAba('pendentes'));
+document.getElementById('notasTabCumpridas').addEventListener('click', () => setNotasAba('cumpridas'));
+
 function renderNotas(){
   const board = document.getElementById('notasBoard');
   if (!board) return;
-  if (notasRapidas.length === 0) {
-    board.innerHTML = '<div class="panel-empty">Nenhuma nota ainda.</div>';
+  const lista = notasRapidas.filter(n => notasAbaAtiva === 'cumpridas' ? n.cumprida : !n.cumprida);
+  if (lista.length === 0) {
+    board.innerHTML = `<div class="panel-empty">${notasAbaAtiva === 'cumpridas' ? 'Nenhuma nota cumprida ainda.' : 'Nenhuma nota pendente.'}</div>`;
     return;
   }
-  board.innerHTML = notasRapidas.slice().reverse().map(n => `
-    <div class="postit">
+  board.innerHTML = lista.slice().reverse().map(n => `
+    <div class="postit${n.cumprida ? ' cumprida' : ''}">
       <div class="txt">${escapeHtml(n.texto)}</div>
-      <button type="button" class="rm" title="Apagar nota" onclick="removerNota('${n.id}')">✕</button>
+      <div class="postit-actions">
+        <button type="button" class="ok" title="${n.cumprida ? 'Reabrir nota' : 'Marcar como cumprida'}" onclick="cumprirNota('${n.id}')">${n.cumprida ? '↺' : '✓'}</button>
+        <button type="button" class="rm" title="Apagar nota" onclick="removerNota('${n.id}')">✕</button>
+      </div>
     </div>
   `).join('');
+}
+function cumprirNota(id){
+  const n = notasRapidas.find(x => x.id === id);
+  if (!n) return;
+  n.cumprida = !n.cumprida;
+  n.cumprida_em = n.cumprida ? new Date().toISOString() : null;
+  n._sync_em = new Date().toISOString();
+  saveNotas();
+  renderNotas();
 }
 function removerNota(id){
   registrarExclusao('nota', id);
@@ -1093,13 +1168,80 @@ document.getElementById('addNotaBtn').addEventListener('click', () => {
   const texto = input.value.trim();
   if (!texto) return;
   const agora = new Date().toISOString();
-  notasRapidas.push({ id: uid(), texto, criado_em: agora, _sync_em: agora });
+  notasRapidas.push({ id: uid(), texto, criado_em: agora, _sync_em: agora, cumprida:false, cumprida_em:null });
   saveNotas();
   input.value = '';
   renderNotas();
 });
 document.getElementById('novaNotaInput').addEventListener('keydown', function(e){
   if (e.key === 'Enter') { e.preventDefault(); document.getElementById('addNotaBtn').click(); }
+});
+
+let diarioBordo = [];
+function loadDiario(){
+  try {
+    const raw = localStorage.getItem('gestor_diario_v1');
+    diarioBordo = raw ? JSON.parse(raw) : [];
+  } catch(e) { diarioBordo = []; }
+}
+function saveDiario(){
+  salvarDiarioLocal();
+  registrarAlteracaoLocal();
+}
+function horaAtualHHMM(){ return new Date().toTimeString().slice(0,5); }
+
+function renderDiarioHoje(){
+  const el = document.getElementById('diarioHojeList');
+  if (!el) return;
+  const hoje = diarioBordo.filter(d => d.data === todayISO()).slice().sort((a,b) => (a.hora||'').localeCompare(b.hora||''));
+  el.innerHTML = hoje.length === 0
+    ? '<div class="panel-empty">Nada registrado ainda hoje.</div>'
+    : hoje.map(d => `<div class="mini-row"><span class="r-title">${escapeHtml(d.hora||'')} — ${escapeHtml(d.texto)}</span><span class="r-tag"><a href="#" onclick="removerDiario('${d.id}');return false;" style="color:var(--red);">remover</a></span></div>`).join('');
+}
+
+function renderDiarioCompleto(){
+  const el = document.getElementById('diarioCompleto');
+  if (!el) return;
+  if (diarioBordo.length === 0) { el.innerHTML = '<div class="empty-state">Nenhum registro no diário de bordo ainda. Use o campo na Home para começar.</div>'; return; }
+  const porDia = {};
+  diarioBordo.forEach(d => { (porDia[d.data] = porDia[d.data] || []).push(d); });
+  const dias = Object.keys(porDia).sort((a,b) => b.localeCompare(a));
+  el.innerHTML = dias.map(dia => {
+    const entradas = porDia[dia].slice().sort((a,b) => (a.hora||'').localeCompare(b.hora||''));
+    return `
+      <div class="panel diario-day" style="max-height:none;">
+        <h3>${escapeHtml(fmtData(dia))}${dia === todayISO() ? ' · Hoje' : ''}</h3>
+        ${entradas.map(d => `<div class="mini-row"><span class="r-title">${escapeHtml(d.hora||'')} — ${escapeHtml(d.texto)}</span><span class="r-tag"><a href="#" onclick="removerDiario('${d.id}');return false;" style="color:var(--red);">remover</a></span></div>`).join('')}
+      </div>
+    `;
+  }).join('');
+}
+
+function removerDiario(id){
+  if (!confirm('Remover este registro do diário de bordo?')) return;
+  registrarExclusao('diario', id);
+  diarioBordo = diarioBordo.filter(d => d.id !== id);
+  saveDiario();
+  renderDiarioHoje();
+  renderDiarioCompleto();
+}
+
+document.getElementById('addDiarioBtn').addEventListener('click', () => {
+  const textoEl = document.getElementById('diarioTextoInput');
+  const horaEl = document.getElementById('diarioHoraInput');
+  const texto = textoEl.value.trim();
+  if (!texto) return;
+  const hora = horaEl.value || horaAtualHHMM();
+  const agora = new Date().toISOString();
+  diarioBordo.push({ id: uid(), texto, data: todayISO(), hora, criado_em: agora, _sync_em: agora });
+  saveDiario();
+  textoEl.value = '';
+  horaEl.value = horaAtualHHMM();
+  renderDiarioHoje();
+  renderDiarioCompleto();
+});
+document.getElementById('diarioTextoInput').addEventListener('keydown', function(e){
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('addDiarioBtn').click(); }
 });
 
 function renderEmailsTrabalho(){
@@ -1620,6 +1762,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
     btn.classList.add('active');
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-' + btn.dataset.view).classList.add('active');
+    fecharMenuMobile();
   });
 });
 ['filterText','filterCategoria','filterSituacao'].forEach(id => document.getElementById(id).addEventListener('input', renderLista));
@@ -1638,6 +1781,17 @@ document.getElementById('syncBtn').addEventListener('click', () => {
   }
   sincronizarDrive();
 });
+
+function abrirMenuMobile(){
+  document.querySelector('.sidebar').classList.add('open');
+  document.getElementById('sidebarBackdrop').classList.add('active');
+}
+function fecharMenuMobile(){
+  document.querySelector('.sidebar').classList.remove('open');
+  document.getElementById('sidebarBackdrop').classList.remove('active');
+}
+document.getElementById('menuToggleBtn').addEventListener('click', abrirMenuMobile);
+document.getElementById('sidebarBackdrop').addEventListener('click', fecharMenuMobile);
 
 document.getElementById('pickDriveBtn').addEventListener('click', abrirPickerDrive);
 
@@ -1754,7 +1908,8 @@ async function entrar(nome, viaGoogle){
   document.getElementById('userLabel2').textContent = (nome || 'Lincoln') + (viaGoogle ? ' · conta Google' : ' · modo local');
   document.getElementById('onboarding').style.display = 'none';
   document.getElementById('app').style.display = 'block';
-  load(); loadNotas(); renderAll();
+  document.getElementById('diarioHoraInput').value = horaAtualHHMM();
+  load(); loadNotas(); loadDiario(); renderAll();
   const syncBtn = document.getElementById('syncBtn');
   syncBtn.style.display = viaGoogle ? 'inline-block' : 'none';
   if (viaGoogle) {
