@@ -263,8 +263,6 @@
       Continuar com o Google
     </button>
     <div class="login-note" id="configNote">
-      Este login só funciona depois que você preencher <code>GOOGLE_CLIENT_ID</code> no topo do script deste arquivo com o Client ID do seu próprio projeto no Google Cloud, e abrir esta página em um endereço http/https cadastrado como origem autorizada — nunca direto do arquivo local. Enquanto isso não estiver feito, o botão acima mostra o erro do Google explicando o que falta, em vez de simular um login.
-      Ao entrar com a mesma conta Google no computador e no celular, atividades e notas serão sincronizadas automaticamente pelo Google Drive.
     </div>
     <button class="link-btn" id="showFallback">Testar sem Google, só com meu nome (modo local)</button>
     <div class="name-fallback" id="nameFallback">
@@ -378,6 +376,22 @@
       <!-- DIÁRIO DE BORDO -->
       <section class="view" id="view-diario">
         <div class="section-title">Diário de bordo — histórico completo</div>
+        <div class="report-controls">
+          <h3>Baixar relatório do diário</h3>
+          <div class="sub">Arquivo .csv com data, hora e o registro de cada entrada, em ordem cronológica.</div>
+          <div class="report-btns">
+            <button class="btn btn-primary" id="repDiario7">Últimos 7 dias</button>
+            <button class="btn btn-primary" id="repDiario30">Últimos 30 dias</button>
+            <button class="btn btn-primary" id="repDiario90">Últimos 90 dias</button>
+            <button class="btn" id="repDiarioTudo">Tudo</button>
+          </div>
+          <div class="report-row">
+            <input type="date" id="repDiarioInicio" style="padding:8px 10px; border-radius:8px; border:1px solid var(--paper-line); background:var(--paper); color:var(--text); font-size:0.85rem;">
+            <span style="color:var(--text-muted); font-size:0.85rem;">até</span>
+            <input type="date" id="repDiarioFim" style="padding:8px 10px; border-radius:8px; border:1px solid var(--paper-line); background:var(--paper); color:var(--text); font-size:0.85rem;">
+            <button class="btn btn-primary" id="repDiarioCustom">Baixar período escolhido</button>
+          </div>
+        </div>
         <div id="diarioCompleto"></div>
       </section>
 
@@ -1910,10 +1924,45 @@ function gerarRelatorioAtividade(id){
   baixarArquivo(`relatorio-atividade-${(a.titulo||'sem-titulo').slice(0,40).replace(/[^\w\-]+/g,'_')}.csv`, csv, 'text/csv;charset=utf-8;');
 }
 
+function gerarRelatorioDiarioPeriodo(dataInicioISO, dataFimISO){
+  const linhas = [['Data','Hora','Registro']];
+  const filtrados = diarioBordo
+    .filter(d => (!dataInicioISO || d.data >= dataInicioISO) && (!dataFimISO || d.data <= dataFimISO))
+    .slice()
+    .sort((a,b) => (a.data + (a.hora||'')).localeCompare(b.data + (b.hora||'')));
+  filtrados.forEach(d => linhas.push([fmtData(d.data), d.hora || '', d.texto]));
+  const csv = linhas.map(l => l.map(csvEscape).join(';')).join('\n');
+  const sufixo = (dataInicioISO || dataFimISO) ? `${dataInicioISO || 'inicio'}_a_${dataFimISO || todayISO()}` : `completo-${todayISO()}`;
+  baixarArquivo(`diario-de-bordo-${sufixo}.csv`, csv, 'text/csv;charset=utf-8;');
+}
+
 document.getElementById('rep30').addEventListener('click', () => gerarRelatorioPeriodo(30));
 document.getElementById('rep60').addEventListener('click', () => gerarRelatorioPeriodo(60));
 document.getElementById('rep90').addEventListener('click', () => gerarRelatorioPeriodo(90));
 document.getElementById('repAtividadeBtn').addEventListener('click', () => gerarRelatorioAtividade(document.getElementById('repAtividadeSelect').value));
+
+document.getElementById('repDiario7').addEventListener('click', () => {
+  const limite = new Date(); limite.setDate(limite.getDate() - 7);
+  gerarRelatorioDiarioPeriodo(limite.toISOString().slice(0,10), null);
+});
+document.getElementById('repDiario30').addEventListener('click', () => {
+  const limite = new Date(); limite.setDate(limite.getDate() - 30);
+  gerarRelatorioDiarioPeriodo(limite.toISOString().slice(0,10), null);
+});
+document.getElementById('repDiario90').addEventListener('click', () => {
+  const limite = new Date(); limite.setDate(limite.getDate() - 90);
+  gerarRelatorioDiarioPeriodo(limite.toISOString().slice(0,10), null);
+});
+document.getElementById('repDiarioTudo').addEventListener('click', () => {
+  gerarRelatorioDiarioPeriodo(null, null);
+});
+document.getElementById('repDiarioCustom').addEventListener('click', () => {
+  const inicio = document.getElementById('repDiarioInicio').value;
+  const fim = document.getElementById('repDiarioFim').value;
+  if (!inicio && !fim) { alert('Escolha ao menos uma data de início ou de fim.'); return; }
+  if (inicio && fim && inicio > fim) { alert('A data de início precisa ser antes da data de fim.'); return; }
+  gerarRelatorioDiarioPeriodo(inicio || null, fim || null);
+});
 
 /* ---------- ONBOARDING ---------- */
 async function entrar(nome, viaGoogle){
