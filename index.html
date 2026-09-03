@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title> Controle | Lincoln Junior</title>
+<title>Gestor de Atividades — Lincoln Junior (integrado ao Google)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -100,7 +100,8 @@
 
   .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
   .panel { background:var(--paper-card); border:1px solid var(--paper-line); border-radius:10px; padding:14px 16px; max-height:230px; overflow-y:auto; }
-  .panel h3 { font-size:0.86rem; margin:0 0 10px 0; font-weight:600; }
+  .panel h3 { font-size:0.86rem; margin:0 0 10px 0; font-weight:600; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .btn-xs { padding:4px 10px; font-size:0.74rem; border-radius:6px; border:1px solid var(--paper-line); background:var(--paper-card); color:var(--steel); cursor:pointer; font-family:inherit; }
   .panel-sub { font-size:0.72rem; color:var(--text-muted); font-weight:600; margin:12px 0 6px 0; text-transform:none; }
   .panel-sub:first-child { margin-top:0; }
   .mini-row { display:flex; justify-content:space-between; gap:10px; padding:6px 0; border-top:1px solid var(--paper-line); font-size:0.82rem; }
@@ -257,7 +258,7 @@
         <div class="section-title">Agenda e acompanhamento</div>
         <div class="two-col">
           <div class="panel">
-            <h3>Agenda Google</h3>
+            <h3>Agenda Google <button type="button" class="btn-xs" id="novoEventoBtn">+ Novo compromisso</button></h3>
             <div id="agendaBox" class="panel-empty">Conecte sua conta Google para trazer seus próximos compromissos aqui.</div>
           </div>
           <div class="panel">
@@ -343,6 +344,7 @@
         <div class="field"><label>Prioridade manual (opcional)</label>
           <select id="f_prioridade_manual"><option value="">Calcular automaticamente</option><option>Crítica</option><option>Urgente</option><option>Alta</option><option>Normal</option><option>Baixa</option></select>
         </div>
+        <div class="field"><label>Data de entrada no fluxo</label><input type="date" id="f_data_entrada"></div>
         <div class="field"><label>Prazo oficial</label><input type="date" id="f_prazo_oficial"></div>
         <div class="field"><label>Prazo interno</label><input type="date" id="f_prazo_interno"></div>
         <div class="field"><label>Percentual de conclusão</label><input type="number" min="0" max="100" id="f_percentual"></div>
@@ -375,6 +377,32 @@
   </div>
 </div>
 
+<!-- MODAL NOVO COMPROMISSO (Google Agenda) -->
+<div class="modal-overlay" id="eventModalOverlay">
+  <div class="modal" style="max-width:460px;">
+    <h2>Novo compromisso na Google Agenda</h2>
+    <div class="sub">Cria o evento direto na sua Google Agenda real — nada fica só neste app.</div>
+    <form id="eventoForm">
+      <div class="form-grid">
+        <div class="field full"><label>Título *</label><input type="text" id="ev_titulo" required></div>
+        <div class="field"><label>Data *</label><input type="date" id="ev_data" required></div>
+        <div class="field"></div>
+        <div class="field"><label>Início *</label><input type="time" id="ev_inicio" required></div>
+        <div class="field"><label>Término *</label><input type="time" id="ev_fim" required></div>
+        <div class="field full"><label>Local ou link</label><input type="text" id="ev_local" placeholder="Sala, endereço ou link da videochamada"></div>
+        <div class="field full"><label>Descrição</label><textarea id="ev_descricao"></textarea></div>
+      </div>
+      <div class="modal-actions">
+        <div class="left"></div>
+        <div class="right">
+          <button type="button" class="btn" id="eventoCancelBtn">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Criar na Google Agenda</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 /* ======================================================================
    CONFIGURAÇÃO DO GOOGLE — preencha com os dados do SEU projeto
@@ -382,7 +410,7 @@
    ====================================================================== */
 const GOOGLE_CLIENT_ID = "168552508927-4474arbuqhhef9iaps6n67rr63saeslo.apps.googleusercontent.com";
 const GOOGLE_API_KEY = "SUA_API_KEY_AQUI";
-const GOOGLE_SCOPES = "email profile https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/gmail.readonly";
+const GOOGLE_SCOPES = "email profile https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/gmail.readonly";
 let pickerInited = false;
 let googleAccessToken = null;
 let googleProfile = null;
@@ -419,9 +447,9 @@ function todayISO(){ return new Date().toISOString().slice(0,10); }
 function seedExemplos(){
   const t = new Date(); const iso = d => { const x = new Date(t); x.setDate(x.getDate()+d); return x.toISOString().slice(0,10); };
   return [
-    { id: uid(), titulo:"[Exemplo] Ofício — resposta pendente à Empresa Exemplo Ltda.", descricao:"", categoria:"Ofício", situacao:"Aguardando resposta", processo:"", oficio:"0142/2026", interessado:"Empresa Exemplo Ltda.", unidade:"", responsavel:"", prioridade_manual:"", prazo_oficial: iso(-2), prazo_interno:"", percentual:0, drive:"", proxima:"Enviar reiteração de cobrança", dependencia:"", observacoes:"Dado fictício de demonstração.", criado_em: iso(-5), atualizado_em: iso(-5), historico:[] },
-    { id: uid(), titulo:"[Exemplo] Parecer de reequilíbrio — Contrato Exemplo 12/2025", descricao:"", categoria:"Reequilíbrio econômico-financeiro", situacao:"Aguardando revisão", processo:"", oficio:"", interessado:"Empresa Exemplo Fictícia S.A.", unidade:"", responsavel:"", prioridade_manual:"", prazo_oficial: iso(1), prazo_interno:"", percentual:60, drive:"", proxima:"Concluir revisão do parecer", dependencia:"", observacoes:"Dado fictício de demonstração.", criado_em: iso(-3), atualizado_em: iso(-1), historico:[] },
-    { id: uid(), titulo:"[Exemplo] Pregão Exemplo nº 000/2026 sem movimentação", descricao:"", categoria:"Licitação", situacao:"Em análise", processo:"", oficio:"", interessado:"", unidade:"", responsavel:"", prioridade_manual:"", prazo_oficial:"", prazo_interno:"", percentual:30, drive:"", proxima:"Verificar documentação pendente", dependencia:"", observacoes:"Dado fictício de demonstração.", criado_em: iso(-14), atualizado_em: iso(-9), historico:[] }
+    { id: uid(), titulo:"[Exemplo] Ofício — resposta pendente à Empresa Exemplo Ltda.", descricao:"", categoria:"Ofício", situacao:"Aguardando resposta", processo:"", oficio:"0142/2026", interessado:"Empresa Exemplo Ltda.", unidade:"", responsavel:"", prioridade_manual:"", prazo_oficial: iso(-2), prazo_interno:"", percentual:0, drive:"", proxima:"Enviar reiteração de cobrança", dependencia:"", observacoes:"Dado fictício de demonstração.", criado_em: iso(-5), atualizado_em: iso(-5), data_entrada: iso(-5), historico:[] },
+    { id: uid(), titulo:"[Exemplo] Parecer de reequilíbrio — Contrato Exemplo 12/2025", descricao:"", categoria:"Reequilíbrio econômico-financeiro", situacao:"Aguardando revisão", processo:"", oficio:"", interessado:"Empresa Exemplo Fictícia S.A.", unidade:"", responsavel:"", prioridade_manual:"", prazo_oficial: iso(1), prazo_interno:"", percentual:60, drive:"", proxima:"Concluir revisão do parecer", dependencia:"", observacoes:"Dado fictício de demonstração.", criado_em: iso(-3), atualizado_em: iso(-1), data_entrada: iso(-3), historico:[] },
+    { id: uid(), titulo:"[Exemplo] Pregão Exemplo nº 000/2026 sem movimentação", descricao:"", categoria:"Licitação", situacao:"Em análise", processo:"", oficio:"", interessado:"", unidade:"", responsavel:"", prioridade_manual:"", prazo_oficial:"", prazo_interno:"", percentual:30, drive:"", proxima:"Verificar documentação pendente", dependencia:"", observacoes:"Dado fictício de demonstração.", criado_em: iso(-32), atualizado_em: iso(-9), data_entrada: iso(-32), historico:[] }
   ];
 }
 
@@ -454,24 +482,36 @@ function computarPrioridade(a){
   const prazo = a.prazo_oficial || a.prazo_interno;
   const diasPrazo = diffDias(prazo);
   const diasSemMov = a.atualizado_em ? Math.round((new Date(todayISO()) - new Date(a.atualizado_em)) / 86400000) : 0;
+  const diasEntrada = a.data_entrada ? Math.round((new Date(todayISO()) - new Date(a.data_entrada)) / 86400000) : null;
+
+  const rank = { "Crítica":4, "Urgente":3, "Alta":2, "Normal":1, "Baixa":0 };
   let nivel = "Normal";
   let motivos = [];
+  function considerar(candidato, motivo){
+    motivos.push(motivo);
+    if (rank[candidato] > rank[nivel]) nivel = candidato;
+  }
 
   if (diasPrazo !== null && diasPrazo < 0) {
-    nivel = "Crítica";
-    motivos.push(`o prazo venceu há ${Math.abs(diasPrazo)} dia(s)`);
-  } else if (diasPrazo !== null && diasPrazo <= 2) {
-    nivel = "Urgente";
-    motivos.push(diasPrazo === 0 ? "o prazo vence hoje" : `o prazo vence em ${diasPrazo} dia(s)`);
-  } else if (diasPrazo !== null && diasPrazo <= 7) {
-    nivel = "Alta";
-    motivos.push(`o prazo vence em ${diasPrazo} dias`);
-  } else if (diasSemMov >= 10) {
-    nivel = "Alta";
-    motivos.push(`está sem movimentação há ${diasSemMov} dias`);
-  } else if (diasPrazo === null) {
-    nivel = "Baixa";
-    motivos.push("não há prazo definido");
+    considerar("Crítica", `o prazo venceu há ${Math.abs(diasPrazo)} dia(s)`);
+  }
+  if (diasEntrada !== null && diasEntrada >= 30) {
+    considerar("Crítica", `está no seu fluxo há ${diasEntrada} dias, passando do limite de 30 dias`);
+  }
+  if (diasPrazo !== null && diasPrazo >= 0 && diasPrazo <= 2) {
+    considerar("Urgente", diasPrazo === 0 ? "o prazo vence hoje" : `o prazo vence em ${diasPrazo} dia(s)`);
+  }
+  if (diasPrazo !== null && diasPrazo > 2 && diasPrazo <= 7) {
+    considerar("Alta", `o prazo vence em ${diasPrazo} dias`);
+  }
+  if (diasEntrada !== null && diasEntrada >= 15 && diasEntrada < 30) {
+    considerar("Alta", `está no seu fluxo há ${diasEntrada} dias, passando do limite de atenção de 15 dias`);
+  }
+  if (diasSemMov >= 10) {
+    considerar("Alta", `está sem movimentação há ${diasSemMov} dias`);
+  }
+  if (motivos.length === 0 && diasPrazo === null) {
+    considerar("Baixa", "não há prazo definido");
   }
 
   if (["Aguardando resposta","Aguardando terceiro"].includes(a.situacao) && nivel !== "Crítica") {
@@ -482,7 +522,7 @@ function computarPrioridade(a){
     ? `Prioridade ${nivel.toLowerCase()} porque ${motivos.join(" e ")}.`
     : `Prioridade ${nivel.toLowerCase()} — sem fatores de risco identificados no momento.`;
 
-  return { nivel, justificativa, diasPrazo, diasSemMov };
+  return { nivel, justificativa, diasPrazo, diasSemMov, diasEntrada };
 }
 
 function badgeClass(nivel){ return (nivel||"").toLowerCase(); }
@@ -529,7 +569,7 @@ function renderMeuDia(){
           <div class="badges"><span class="badge ${badgeClass(p.nivel)}">${p.nivel}</span><span class="badge">${a.categoria}</span></div>
         </div>
         <div class="p-justif">${p.justificativa}</div>
-        <div class="p-meta">${a.processo ? 'Processo '+escapeHtml(a.processo)+' · ' : ''}${a.prazo_oficial ? 'Prazo: '+fmtData(a.prazo_oficial) : 'Sem prazo cadastrado'}${a.resposta_oficio_id ? ' · Resposta ao ofício: '+escapeHtml((atividades.find(x=>x.id===a.resposta_oficio_id)||{}).titulo||'') : ''}</div>
+        <div class="p-meta">${a.processo ? 'Processo '+escapeHtml(a.processo)+' · ' : ''}${a.prazo_oficial ? 'Prazo: '+fmtData(a.prazo_oficial) : 'Sem prazo cadastrado'}${(p.diasEntrada !== null && p.diasEntrada !== undefined && p.diasEntrada >= 15) ? ' · No fluxo há '+p.diasEntrada+' dias' : ''}${a.resposta_oficio_id ? ' · Resposta ao ofício: '+escapeHtml((atividades.find(x=>x.id===a.resposta_oficio_id)||{}).titulo||'') : ''}</div>
       </div>
     `).join('');
   }
@@ -589,6 +629,12 @@ function renderCentralAlertas(){
       alertas.push({ nivel:'critico', titulo: `Prazo vencido — ${a.titulo}`, msg: `Venceu há ${Math.abs(dp)} dia(s).` });
     } else if (dp !== null && dp === 0) {
       alertas.push({ nivel:'urgente', titulo: `Prazo vence hoje — ${a.titulo}`, msg: 'Verificar e concluir hoje, se possível.' });
+    }
+    const de = a.data_entrada ? Math.round((new Date(todayISO()) - new Date(a.data_entrada)) / 86400000) : null;
+    if (de !== null && de >= 30) {
+      alertas.push({ nivel:'critico', titulo: `Mais de 30 dias no fluxo — ${a.titulo}`, msg: `Entrou há ${de} dias — prioridade elevada ao máximo.` });
+    } else if (de !== null && de >= 15) {
+      alertas.push({ nivel:'atencao', titulo: `Mais de 15 dias no fluxo — ${a.titulo}`, msg: `Entrou há ${de} dias.` });
     }
   });
   emailsTrabalho.forEach(e => {
@@ -698,6 +744,7 @@ function abrirNovo(){
   document.getElementById('modalTitle').textContent = 'Cadastrar atividade';
   document.getElementById('atividadeForm').reset();
   document.getElementById('f_id').value = '';
+  document.getElementById('f_data_entrada').value = todayISO();
   document.getElementById('deleteBtn').style.display = 'none';
   document.getElementById('historyList').style.display = 'none';
   document.getElementById('confirmBox').classList.remove('active');
@@ -721,6 +768,7 @@ function abrirEdicao(id){
   document.getElementById('f_unidade').value = a.unidade || '';
   document.getElementById('f_responsavel').value = a.responsavel || '';
   document.getElementById('f_prioridade_manual').value = a.prioridade_manual || '';
+  document.getElementById('f_data_entrada').value = a.data_entrada || '';
   document.getElementById('f_prazo_oficial').value = a.prazo_oficial || '';
   document.getElementById('f_prazo_interno').value = a.prazo_interno || '';
   document.getElementById('f_percentual').value = a.percentual || 0;
@@ -782,6 +830,7 @@ document.getElementById('atividadeForm').addEventListener('submit', function(e){
     responsavel: document.getElementById('f_responsavel').value.trim(),
     prioridade_manual: document.getElementById('f_prioridade_manual').value,
     prazo_oficial: document.getElementById('f_prazo_oficial').value,
+    data_entrada: document.getElementById('f_data_entrada').value,
     prazo_interno: document.getElementById('f_prazo_interno').value,
     percentual: Number(document.getElementById('f_percentual').value || 0),
     drive: document.getElementById('f_drive').value.trim(),
@@ -980,6 +1029,61 @@ document.getElementById('googleBtn').addEventListener('click', () => {
     client.requestAccessToken();
   } catch (e) {
     alert('Não foi possível iniciar o login do Google: ' + e.message);
+  }
+});
+
+document.getElementById('novoEventoBtn').addEventListener('click', abrirModalEvento);
+document.getElementById('eventoCancelBtn').addEventListener('click', fecharModalEvento);
+document.getElementById('eventModalOverlay').addEventListener('click', e => { if (e.target.id === 'eventModalOverlay') fecharModalEvento(); });
+
+function abrirModalEvento(){
+  if (!googleAccessToken) {
+    alert('Conecte sua conta Google (tela inicial) antes de criar um compromisso — isso grava direto na sua Google Agenda real.');
+    return;
+  }
+  document.getElementById('eventoForm').reset();
+  document.getElementById('ev_data').value = todayISO();
+  document.getElementById('ev_inicio').value = '09:00';
+  document.getElementById('ev_fim').value = '10:00';
+  document.getElementById('eventModalOverlay').classList.add('active');
+}
+function fecharModalEvento(){
+  document.getElementById('eventModalOverlay').classList.remove('active');
+}
+
+document.getElementById('eventoForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  if (!googleAccessToken) { alert('Sessão do Google não encontrada. Conecte-se novamente.'); return; }
+  const data = document.getElementById('ev_data').value;
+  const inicio = document.getElementById('ev_inicio').value;
+  const fim = document.getElementById('ev_fim').value;
+  if (fim <= inicio) { alert('O horário de término precisa ser depois do início.'); return; }
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Recife';
+  const body = {
+    summary: document.getElementById('ev_titulo').value.trim(),
+    location: document.getElementById('ev_local').value.trim(),
+    description: document.getElementById('ev_descricao').value.trim(),
+    start: { dateTime: `${data}T${inicio}:00`, timeZone: tz },
+    end: { dateTime: `${data}T${fim}:00`, timeZone: tz }
+  };
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true; btn.textContent = 'Criando...';
+  try {
+    const r = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + googleAccessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error((err.error && err.error.message) || ('HTTP ' + r.status));
+    }
+    fecharModalEvento();
+    buscarAgendaGoogle();
+  } catch (err) {
+    alert('Não foi possível criar o compromisso: ' + err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Criar na Google Agenda';
   }
 });
 
