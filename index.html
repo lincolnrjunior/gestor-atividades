@@ -263,6 +263,8 @@
       Continuar com o Google
     </button>
     <div class="login-note" id="configNote">
+      Este login só funciona depois que você preencher <code>GOOGLE_CLIENT_ID</code> no topo do script deste arquivo com o Client ID do seu próprio projeto no Google Cloud, e abrir esta página em um endereço http/https cadastrado como origem autorizada — nunca direto do arquivo local. Enquanto isso não estiver feito, o botão acima mostra o erro do Google explicando o que falta, em vez de simular um login.
+      Ao entrar com a mesma conta Google no computador e no celular, atividades e notas serão sincronizadas automaticamente pelo Google Drive.
     </div>
     <button class="link-btn" id="showFallback">Testar sem Google, só com meu nome (modo local)</button>
     <div class="name-fallback" id="nameFallback">
@@ -286,6 +288,7 @@
       <button class="nav-item" data-view="relatorios">Relatórios</button>
     </nav>
     <div class="sidebar-foot">
+      <button id="sairBtn">Sair / trocar de conta</button>
       <button id="resetData">Limpar todos os dados</button>
     </div>
   </aside>
@@ -1771,6 +1774,12 @@ document.querySelectorAll('.nav-item').forEach(btn => {
   });
 });
 ['filterText','filterCategoria','filterSituacao'].forEach(id => document.getElementById(id).addEventListener('input', renderLista));
+
+document.getElementById('sairBtn').addEventListener('click', () => {
+  if (!confirm('Sair e voltar para a tela de login? Suas atividades continuam salvas neste navegador.')) return;
+  localStorage.removeItem('gestor_perfil_v1');
+  location.reload();
+});
 
 document.getElementById('resetData').addEventListener('click', () => {
   if (!confirm('Isso apaga todas as atividades, inclusive dos aparelhos sincronizados. Continuar?')) return;
