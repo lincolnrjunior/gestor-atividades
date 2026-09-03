@@ -275,6 +275,12 @@
 
         <div class="section-title">Prazos</div>
         <div class="deadline-strip" id="deadlineStrip"></div>
+
+        <div class="section-title">E-mails de trabalho (Gmail)</div>
+        <div class="panel" style="max-height:none;">
+          <div style="font-size:0.76rem; color:var(--text-muted); margin-bottom:8px;">Últimos 5, sinalizados por palavra-chave nos últimos 7 dias — confira antes de agir.</div>
+          <div id="emailsTrabalhoBox" class="panel-empty">Conecte sua conta Google para sinalizar e-mails de trabalho aqui.</div>
+        </div>
       </section>
 
       <!-- KANBAN -->
@@ -595,6 +601,7 @@ function renderMeuDia(){
   `;
 
   renderAcompanhamento();
+  renderEmailsTrabalho();
   renderCentralAlertas();
 }
 
@@ -620,6 +627,25 @@ function renderAcompanhamento(){
     : parados.map(({a,dias}) => `<div class="mini-row"><span class="r-title">${escapeHtml(a.titulo)}</span><span class="r-tag">${dias} dias parado</span></div>`).join('');
 }
 
+function renderEmailsTrabalho(){
+  const box = document.getElementById('emailsTrabalhoBox');
+  if (!box) return;
+  if (!googleAccessToken) {
+    box.className = 'panel-empty';
+    box.textContent = 'Conecte sua conta Google para sinalizar e-mails de trabalho aqui.';
+    return;
+  }
+  if (emailsTrabalho.length === 0) {
+    box.className = 'panel-empty';
+    box.textContent = 'Nenhum e-mail sinalizado nos últimos 7 dias.';
+    return;
+  }
+  box.className = '';
+  box.innerHTML = emailsTrabalho.slice(0,5).map(e =>
+    `<div class="mini-row"><span class="r-title">${escapeHtml(e.assunto)}</span><span class="r-tag">${escapeHtml(e.de)}</span></div>`
+  ).join('');
+}
+
 function renderCentralAlertas(){
   const alertas = [];
   atividades.forEach(a => {
@@ -637,10 +663,6 @@ function renderCentralAlertas(){
       alertas.push({ nivel:'atencao', titulo: `Mais de 15 dias no fluxo — ${a.titulo}`, msg: `Entrou há ${de} dias.` });
     }
   });
-  emailsTrabalho.forEach(e => {
-    alertas.push({ nivel:'info', titulo: `Possível e-mail de trabalho: ${e.assunto}`, msg: `De: ${e.de} · sinalizado por palavra-chave, confira antes de agir.` });
-  });
-
   const el = document.getElementById('centralAlertas');
   if (alertas.length === 0) {
     el.innerHTML = '<div class="panel-empty">Sem alertas no momento.</div>';
@@ -1149,8 +1171,8 @@ async function buscarEmailsTrabalho(){
         encontrados.push({ id, assunto, de, snippet: msg.snippet || '' });
       }
     }
-    emailsTrabalho = encontrados;
-    renderCentralAlertas();
+    emailsTrabalho = encontrados.slice(0, 5);
+    renderEmailsTrabalho();
   } catch (e) {
     console.error('Falha ao buscar e-mails do Gmail:', e.message);
   }
