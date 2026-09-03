@@ -202,6 +202,21 @@
 
   .history-list { font-size:0.78rem; color:var(--text-muted); margin-top:14px; border-top:1px solid var(--paper-line); padding-top:10px; }
   .history-row { padding:4px 0; }
+  .detail-modal { max-width:760px; }
+  .detail-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:18px; }
+  .detail-head h2 { font-size:1.35rem; margin:0; line-height:1.3; }
+  .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .detail-field { border:1px solid var(--paper-line); border-radius:8px; padding:10px 12px; background:var(--paper); min-width:0; }
+  .detail-field.full { grid-column:1 / -1; }
+  .detail-label { font-size:0.7rem; color:var(--text-muted); font-weight:600; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.03em; }
+  .detail-value { font-size:0.88rem; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .detail-section { margin-top:20px; }
+  .detail-section h3 { font-size:0.92rem; margin:0 0 9px 0; }
+  .detail-related { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0; border-top:1px solid var(--paper-line); background:none; color:var(--text); text-align:left; cursor:pointer; }
+  .detail-related:first-child { border-top:none; }
+  .detail-related-title { font-weight:600; font-size:0.86rem; }
+  .detail-related-meta { color:var(--text-muted); font-size:0.75rem; margin-top:2px; }
+  .detail-related-arrow { color:var(--steel); font-size:1rem; }
 
   @media (max-width: 900px) {
     .sidebar { display:none; }
@@ -210,6 +225,8 @@
     .deadline-strip { grid-template-columns:repeat(3,1fr); }
     .kanban { grid-template-columns:1fr; }
     .form-grid { grid-template-columns:1fr; }
+    .detail-grid { grid-template-columns:1fr; }
+    .detail-field.full { grid-column:auto; }
     .two-col { grid-template-columns:1fr; }
   }
 </style>
@@ -240,9 +257,9 @@
 <div id="app">
 <div class="app">
   <aside class="sidebar">
-    <div class="brand"><div class="mark">Gestor de Atividades</div><div class="sub" id="userLabel">Lincoln Junior</div></div>
+    <div class="brand"><div class="mark">Demandas</div><div class="sub" id="userLabel">Lincoln Junior</div></div>
     <nav id="nav">
-      <button class="nav-item active" data-view="meudia">Meu dia</button>
+      <button class="nav-item active" data-view="meudia">Home</button>
       <button class="nav-item" data-view="kanban">Quadro Kanban</button>
       <button class="nav-item" data-view="lista">Lista geral<span class="badgecount" id="countTotal">0</span></button>
       <button class="nav-item" data-view="relatorios">Relatórios</button>
@@ -260,7 +277,7 @@
     </div>
     <div class="content">
 
-      <!-- MEU DIA -->
+      <!-- HOME -->
       <section class="view active" id="view-meudia">
         <div class="greeting">
           <div class="kicker" id="dataExtenso"></div>
@@ -439,6 +456,27 @@
   </div>
 </div>
 
+<!-- MODAL DE DETALHES (SOMENTE LEITURA) -->
+<div class="modal-overlay" id="detailModalOverlay" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+  <div class="modal detail-modal">
+    <div class="detail-head">
+      <div>
+        <div class="sub" style="margin-bottom:5px;">Detalhes da atividade</div>
+        <h2 id="detailTitle"></h2>
+      </div>
+      <button type="button" class="btn" id="detailCloseTopBtn" aria-label="Fechar detalhes">Fechar</button>
+    </div>
+    <div id="detailContent"></div>
+    <div class="modal-actions">
+      <div class="left"></div>
+      <div class="right">
+        <button type="button" class="btn" id="detailCloseBtn">Voltar</button>
+        <button type="button" class="btn btn-primary" id="detailEditBtn">Editar atividade</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL NOVO COMPROMISSO (Google Agenda) -->
 <div class="modal-overlay" id="eventModalOverlay">
   <div class="modal" style="max-width:460px;">
@@ -502,9 +540,79 @@ const KANBAN_ORDER = ["Não iniciada","Em andamento","Aguardando terceiro","Susp
 
 let atividades = [];
 let currentEdit = null;
+let currentDetailId = null;
 
 function uid(){ return 'a_' + Date.now() + '_' + Math.random().toString(36).slice(2,7); }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+function normalizarIds(lista, idProprio){
+  return [...new Set(Array.isArray(lista) ? lista : [])]
+    .filter(id => id && id !== idProprio && atividades.some(a => a.id === id));
+}
+
+function normalizarVinculosCarregados(){
+  atividades.forEach(a => { a.relacionadas = normalizarIds(a.relacionadas, a.id); });
+  atividades.forEach(a => {
+    if (a.resposta_oficio_id && atividades.some(x => x.id === a.resposta_oficio_id)) {
+      vincularAtividades(a.id, a.resposta_oficio_id);
+    } else if (a.resposta_oficio_id) {
+      a.resposta_oficio_id = '';
+    }
+  });
+  atividades.forEach(a => {
+    (a.relacionadas || []).forEach(id => vincularAtividades(a.id, id));
+  });
+}
+
+function vincularAtividades(idA, idB){
+  if (!idA || !idB || idA === idB) return;
+  const a = atividades.find(x => x.id === idA);
+  const b = atividades.find(x => x.id === idB);
+  if (!a || !b) return;
+  a.relacionadas = normalizarIds([...(a.relacionadas || []), idB], a.id);
+  b.relacionadas = normalizarIds([...(b.relacionadas || []), idA], b.id);
+}
+
+function desvincularAtividades(idA, idB){
+  const a = atividades.find(x => x.id === idA);
+  const b = atividades.find(x => x.id === idB);
+  if (a) a.relacionadas = (a.relacionadas || []).filter(id => id !== idB);
+  if (b) b.relacionadas = (b.relacionadas || []).filter(id => id !== idA);
+}
+
+function obterIdsRelacionados(a){
+  if (!a) return [];
+  const ids = new Set(normalizarIds(a.relacionadas, a.id));
+  if (a.resposta_oficio_id) ids.add(a.resposta_oficio_id);
+  atividades.forEach(x => {
+    if (x.id !== a.id && (x.resposta_oficio_id === a.id || (x.relacionadas || []).includes(a.id))) ids.add(x.id);
+  });
+  return [...ids].filter(id => atividades.some(x => x.id === id));
+}
+
+function alterarSituacaoComHistorico(atividade, novaSituacao){
+  if (!atividade || atividade.situacao === novaSituacao) return;
+  const anterior = atividade.situacao || '(vazio)';
+  atividade.situacao = novaSituacao;
+  atividade.atualizado_em = todayISO();
+  atividade.historico = atividade.historico || [];
+  atividade.historico.push({
+    campo: 'situacao',
+    de: anterior,
+    para: novaSituacao,
+    quando: new Date().toISOString(),
+    origem: 'Fluxo automático de ofício resposta'
+  });
+}
+
+function recalcularSituacaoOficioOrigem(origemId){
+  const origem = atividades.find(x => x.id === origemId);
+  if (!origem) return;
+  const respostas = atividades.filter(x => x.eh_resposta && x.resposta_oficio_id === origemId);
+  if (respostas.length === 0) return;
+  const existeRespostaFinalizada = respostas.some(r => ['Aguardando expedição', 'Expedido'].includes(r.situacao));
+  alterarSituacaoComHistorico(origem, existeRespostaFinalizada ? 'Concluído' : 'Aguardando terceiro');
+}
 
 function seedExemplos(){
   const t = new Date(); const iso = d => { const x = new Date(t); x.setDate(x.getDate()+d); return x.toISOString().slice(0,10); };
@@ -519,7 +627,8 @@ function load(){
   try {
     const raw = localStorage.getItem('gestor_atividades_v1');
     atividades = raw ? JSON.parse(raw) : seedExemplos();
-    if (!raw) save();
+    normalizarVinculosCarregados();
+    save();
   } catch(e) { atividades = seedExemplos(); }
 }
 function save(){
@@ -605,7 +714,16 @@ function badgeClass(nivel){ return (nivel||"").toLowerCase(); }
 function fmtData(iso){
   if (!iso) return "—";
   const [y,m,d] = iso.split('-');
-  return `${d}/${m}/${y}`;
+  return `${String(d).slice(0,2)}/${m}/${y}`;
+}
+
+function fmtDataHora(iso){
+  if (!iso) return '—';
+  const data = new Date(iso.length === 10 ? iso + 'T00:00:00' : iso);
+  if (Number.isNaN(data.getTime())) return fmtData(iso);
+  const opcoes = { day:'2-digit', month:'2-digit', year:'numeric' };
+  if (iso.includes('T')) Object.assign(opcoes, { hour:'2-digit', minute:'2-digit' });
+  return data.toLocaleString('pt-BR', opcoes);
 }
 
 function saudacaoPorTurno(){
@@ -618,7 +736,7 @@ function dataPorExtenso(){
   return new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
-/* ---------- RENDER: MEU DIA ---------- */
+/* ---------- RENDER: HOME ---------- */
 function renderMeuDia(){
   const nome = (loadPerfil()||{}).nome || "Lincoln";
   document.getElementById('greetingText').textContent = `${saudacaoPorTurno()}, ${nome}!`;
@@ -640,7 +758,7 @@ function renderMeuDia(){
     list.innerHTML = top.map(({a,p}) => `
       <div class="p-card ${badgeClass(p.nivel)}">
         <div class="p-top">
-          <div class="p-title" onclick="abrirEdicao('${a.id}')">${escapeHtml(a.titulo)}</div>
+          <div class="p-title" onclick="abrirDetalhes('${a.id}')">${escapeHtml(a.titulo)}</div>
           <div class="badges"><span class="badge ${badgeClass(p.nivel)}">${p.nivel}</span><span class="badge">${a.categoria}</span></div>
         </div>
         <div class="p-justif">${p.justificativa}</div>
@@ -776,7 +894,7 @@ function renderKanban(){
       <h3>${col}<span>${cols[col].length}</span></h3>
       ${cols[col].length === 0 ? '<div class="k-empty">Vazio</div>' : cols[col].map(a => {
         const p = computarPrioridade(a);
-        return `<div class="k-card" onclick="abrirEdicao('${a.id}')">
+        return `<div class="k-card" onclick="abrirDetalhes('${a.id}')">
           <div class="k-title">${escapeHtml(a.titulo)}</div>
           ${a.prazo_oficial ? 'Prazo: '+fmtData(a.prazo_oficial) : 'Sem prazo'}
           <div class="k-tags"><span class="badge ${badgeClass(p.nivel)}">${p.nivel}</span>${a.urgente ? '<span class="badge critica">URGENTE</span>' : ''}</div>
@@ -812,7 +930,7 @@ function renderLista(){
   wrap.innerHTML = `<table><thead><tr><th>Título</th><th>Categoria</th><th>Situação</th><th>Prazo</th><th>Prioridade</th></tr></thead><tbody>
     ${filtradas.map(a => {
       const p = computarPrioridade(a);
-      return `<tr class="row-clickable" onclick="abrirEdicao('${a.id}')">
+      return `<tr class="row-clickable" onclick="abrirDetalhes('${a.id}')">
         <td>${a.urgente ? '<span style="color:var(--red); font-weight:600;">🔴 </span>' : ''}${escapeHtml(a.titulo)}</td>
         <td>${a.categoria}</td>
         <td><span class="chip badge ${badgeClass(a.situacao==='Concluído'||a.situacao==='Respondido'||a.situacao==='Arquivado' ? 'concluído' : '')}">${a.situacao}</span></td>
@@ -837,6 +955,76 @@ function renderSelectRelatorio(){
   sel.innerHTML = atividades.map(a => `<option value="${a.id}">${escapeHtml(a.titulo)}</option>`).join('');
   if (atual && atividades.some(a => a.id === atual)) sel.value = atual;
 }
+
+/* ---------- DETALHES DA ATIVIDADE ---------- */
+function detalheCampo(rotulo, valor, full = false){
+  const exibido = valor === undefined || valor === null || valor === '' ? '—' : String(valor);
+  return `<div class="detail-field${full ? ' full' : ''}"><div class="detail-label">${escapeHtml(rotulo)}</div><div class="detail-value">${escapeHtml(exibido)}</div></div>`;
+}
+
+function abrirDetalhes(id){
+  const a = atividades.find(x => x.id === id);
+  if (!a) return;
+  currentDetailId = id;
+  document.getElementById('detailTitle').textContent = a.titulo || 'Atividade sem título';
+
+  const anotacoes = (a.anotacoes || []).slice().sort((x,y) => new Date(x.quando) - new Date(y.quando));
+  const anotacoesHtml = anotacoes.length
+    ? anotacoes.map(n => `<div class="history-row"><strong>${escapeHtml(fmtDataHora(n.quando))}</strong> — ${escapeHtml(n.texto)}</div>`).join('')
+    : '<div class="panel-empty">Nenhuma anotação registrada.</div>';
+
+  const relacionados = obterIdsRelacionados(a).map(idRel => atividades.find(x => x.id === idRel)).filter(Boolean);
+  const relacionadosHtml = relacionados.length
+    ? relacionados.map(rel => {
+        let tipo = 'Atividade relacionada';
+        if (a.resposta_oficio_id === rel.id) tipo = 'Ofício de origem';
+        else if (rel.resposta_oficio_id === a.id) tipo = 'Ofício resposta';
+        return `<button type="button" class="detail-related" onclick="abrirDetalhes('${rel.id}')">
+          <span><span class="detail-related-title">${escapeHtml(rel.titulo)}</span><span class="detail-related-meta">${escapeHtml(tipo)} · ${escapeHtml(rel.categoria || 'Sem categoria')} · ${escapeHtml(rel.situacao || 'Sem situação')}</span></span>
+          <span class="detail-related-arrow" aria-hidden="true">›</span>
+        </button>`;
+      }).join('')
+    : '<div class="panel-empty">Nenhuma atividade vinculada a esta demanda.</div>';
+
+  document.getElementById('detailContent').innerHTML = `
+    <div class="detail-grid">
+      ${detalheCampo('Descrição', a.descricao, true)}
+      ${detalheCampo('SILOMS/SIGAD', a.processo)}
+      ${detalheCampo('Número do ofício', a.oficio)}
+      ${detalheCampo('Categoria', a.categoria)}
+      ${detalheCampo('Situação', a.situacao)}
+      ${detalheCampo('Empresa / Interessado', a.interessado)}
+      ${detalheCampo('Unidade / Setor', a.unidade)}
+      ${detalheCampo('Responsável', a.responsavel)}
+      ${detalheCampo('Percentual de conclusão', `${Number(a.percentual || 0)}%`)}
+      ${detalheCampo('Data de entrada', fmtData(a.data_entrada))}
+      ${detalheCampo('Prazo oficial', fmtData(a.prazo_oficial))}
+      ${detalheCampo('Prazo interno', fmtData(a.prazo_interno))}
+      ${detalheCampo('Próxima providência', a.proxima, true)}
+      ${detalheCampo('Dependência / Impedimento', a.dependencia, true)}
+      ${detalheCampo('Observações', a.observacoes, true)}
+    </div>
+    <div class="detail-section"><h3>Anotações em ordem cronológica</h3>${anotacoesHtml}</div>
+    <div class="detail-section"><h3>Atividades vinculadas à demanda</h3>${relacionadosHtml}</div>
+  `;
+  document.getElementById('detailModalOverlay').classList.add('active');
+}
+
+function fecharDetalhes(){
+  document.getElementById('detailModalOverlay').classList.remove('active');
+  currentDetailId = null;
+}
+
+document.getElementById('detailCloseTopBtn').addEventListener('click', fecharDetalhes);
+document.getElementById('detailCloseBtn').addEventListener('click', fecharDetalhes);
+document.getElementById('detailEditBtn').addEventListener('click', () => {
+  const id = currentDetailId;
+  fecharDetalhes();
+  if (id) abrirEdicao(id);
+});
+document.getElementById('detailModalOverlay').addEventListener('click', e => {
+  if (e.target.id === 'detailModalOverlay') fecharDetalhes();
+});
 
 /* ---------- MODAL ---------- */
 function popularSelects(idExcluir){
@@ -905,7 +1093,7 @@ function abrirEdicao(id){
   const histEl = document.getElementById('historyList');
   if (hist.length) {
     histEl.style.display = 'block';
-    histEl.innerHTML = '<strong>Histórico</strong>' + hist.slice().reverse().map(h => `<div class="history-row">${fmtData(h.quando)} — ${escapeHtml(h.campo)}: "${escapeHtml(h.de)}" → "${escapeHtml(h.para)}"</div>`).join('');
+    histEl.innerHTML = '<strong>Histórico</strong>' + hist.slice().reverse().map(h => `<div class="history-row">${escapeHtml(fmtDataHora(h.quando))} — ${escapeHtml(h.campo)}: "${escapeHtml(h.de)}" → "${escapeHtml(h.para)}"</div>`).join('');
   } else { histEl.style.display = 'none'; }
   document.getElementById('anotacoesBox').style.display = 'block';
   document.getElementById('relacionadasBox').style.display = 'block';
@@ -973,26 +1161,6 @@ document.querySelectorAll('#respostaDetalhes [data-status]').forEach(btn => {
     const novaSituacao = STATUS_RESPOSTA_MAP[btn.dataset.status];
     document.getElementById('f_situacao').value = novaSituacao;
     destacarStatusResposta(novaSituacao);
-
-    if (btn.dataset.status === 'assinado' || btn.dataset.status === 'expedido') {
-      const origemId = document.getElementById('f_resposta_oficio').value;
-      if (origemId) {
-        const origem = atividades.find(x => x.id === origemId);
-        if (origem && origem.situacao !== 'Arquivado') {
-          const quer = confirm(`O ofício de origem "${origem.titulo}" pode ser arquivado agora?`);
-          if (quer) {
-            const de = origem.situacao;
-            origem.situacao = 'Arquivado';
-            origem.atualizado_em = todayISO();
-            origem.historico = origem.historico || [];
-            origem.historico.push({ campo: 'situacao', de, para: 'Arquivado', quando: todayISO() });
-            atividades = atividades.map(x => x.id === origem.id ? origem : x);
-            save();
-            renderAll();
-          }
-        }
-      }
-    }
   });
 });
 
@@ -1030,14 +1198,15 @@ document.getElementById('addAnotacaoBtn').addEventListener('click', () => {
 
 function renderRelacionadas(){
   const el = document.getElementById('relacionadasList');
-  const ids = (currentEdit && currentEdit.relacionadas) || [];
+  const ids = obterIdsRelacionados(currentEdit);
   if (ids.length === 0) {
     el.innerHTML = '<div class="panel-empty">Nenhum vínculo ainda.</div>';
   } else {
     el.innerHTML = ids.map(id => {
       const rel = atividades.find(x => x.id === id);
       if (!rel) return '';
-      return `<div class="mini-row"><span class="r-title">${escapeHtml(rel.titulo)} <span style="color:var(--text-muted);">(${escapeHtml(rel.categoria)})</span></span><span class="r-tag"><a href="#" onclick="removerRelacionada('${id}');return false;" style="color:var(--red);">remover</a></span></div>`;
+      const automatico = currentEdit.resposta_oficio_id === id || rel.resposta_oficio_id === currentEdit.id;
+      return `<div class="mini-row"><span class="r-title">${escapeHtml(rel.titulo)} <span style="color:var(--text-muted);">(${escapeHtml(rel.categoria)})</span></span><span class="r-tag">${automatico ? 'vínculo de ofício' : `<a href="#" onclick="removerRelacionada('${id}');return false;" style="color:var(--red);">remover</a>`}</span></div>`;
     }).join('');
   }
   const sel = document.getElementById('novaRelacionadaSelect');
@@ -1048,7 +1217,9 @@ function renderRelacionadas(){
 }
 function removerRelacionada(id){
   if (!currentEdit) return;
-  currentEdit.relacionadas = (currentEdit.relacionadas || []).filter(x => x !== id);
+  const rel = atividades.find(x => x.id === id);
+  if (currentEdit.resposta_oficio_id === id || (rel && rel.resposta_oficio_id === currentEdit.id)) return;
+  desvincularAtividades(currentEdit.id, id);
   save();
   renderRelacionadas();
 }
@@ -1056,8 +1227,7 @@ document.getElementById('addRelacionadaBtn').addEventListener('click', () => {
   if (!currentEdit) return;
   const id = document.getElementById('novaRelacionadaSelect').value;
   if (!id) return;
-  currentEdit.relacionadas = currentEdit.relacionadas || [];
-  if (!currentEdit.relacionadas.includes(id)) currentEdit.relacionadas.push(id);
+  vincularAtividades(currentEdit.id, id);
   save();
   renderRelacionadas();
 });
@@ -1075,7 +1245,14 @@ document.getElementById('f_situacao').addEventListener('change', function(){
 document.getElementById('deleteBtn').addEventListener('click', function(){
   if (!currentEdit) return;
   if (!confirm('Excluir esta atividade? Esta ação não pode ser desfeita.')) return;
-  atividades = atividades.filter(a => a.id !== currentEdit.id);
+  const idExcluido = currentEdit.id;
+  const origemAnteriorId = currentEdit.resposta_oficio_id || '';
+  atividades.forEach(a => {
+    a.relacionadas = (a.relacionadas || []).filter(id => id !== idExcluido);
+    if (a.resposta_oficio_id === idExcluido) a.resposta_oficio_id = '';
+  });
+  atividades = atividades.filter(a => a.id !== idExcluido);
+  if (origemAnteriorId) recalcularSituacaoOficioOrigem(origemAnteriorId);
   save(); renderAll(); fecharModal();
 });
 
@@ -1087,10 +1264,20 @@ document.getElementById('atividadeForm').addEventListener('submit', function(e){
     return;
   }
   const id = document.getElementById('f_id').value || uid();
-  const isNew = !document.getElementById('f_id').value;
+  const ehResposta = document.getElementById('respostaToggle').dataset.active === 'true';
+  const origemSelecionadaId = ehResposta ? document.getElementById('f_resposta_oficio').value : '';
+  if (ehResposta && !origemSelecionadaId) {
+    alert('Selecione o ofício de origem que esta atividade está respondendo.');
+    return;
+  }
+  if (ehResposta && document.getElementById('f_categoria').value !== 'Ofício') {
+    alert('Uma atividade marcada como ofício resposta deve permanecer na categoria “Ofício”.');
+    return;
+  }
   const historico = currentEdit ? (currentEdit.historico || []) : [];
   const anotacoes = currentEdit ? (currentEdit.anotacoes || []) : [];
-  const relacionadas = currentEdit ? (currentEdit.relacionadas || []) : [];
+  const relacionadas = currentEdit ? [...(currentEdit.relacionadas || [])] : [];
+  const origemAnteriorId = currentEdit ? (currentEdit.resposta_oficio_id || '') : '';
 
   const novo = {
     id,
@@ -1098,12 +1285,12 @@ document.getElementById('atividadeForm').addEventListener('submit', function(e){
     descricao: document.getElementById('f_descricao').value.trim(),
     urgente: document.getElementById('urgenteToggle').dataset.active === 'true',
     judicial: document.getElementById('judicialToggle').dataset.active === 'true',
-    eh_resposta: document.getElementById('respostaToggle').dataset.active === 'true',
+    eh_resposta: ehResposta,
     categoria: document.getElementById('f_categoria').value,
     situacao: situacao,
     processo: document.getElementById('f_processo').value.trim(),
     oficio: document.getElementById('f_oficio').value.trim(),
-    resposta_oficio_id: document.getElementById('respostaToggle').dataset.active === 'true' ? document.getElementById('f_resposta_oficio').value : '',
+    resposta_oficio_id: origemSelecionadaId,
     interessado: document.getElementById('f_interessado').value.trim(),
     unidade: document.getElementById('f_unidade').value.trim(),
     responsavel: document.getElementById('f_responsavel').value.trim(),
@@ -1122,15 +1309,27 @@ document.getElementById('atividadeForm').addEventListener('submit', function(e){
   };
 
   if (currentEdit) {
-    ['situacao','prazo_oficial','percentual'].forEach(campo => {
+    ['situacao','prazo_oficial','percentual','resposta_oficio_id'].forEach(campo => {
       if (String(currentEdit[campo]||'') !== String(novo[campo]||'')) {
-        novo.historico.push({ campo, de: currentEdit[campo]||'(vazio)', para: novo[campo]||'(vazio)', quando: todayISO() });
+        novo.historico.push({ campo, de: currentEdit[campo]||'(vazio)', para: novo[campo]||'(vazio)', quando: new Date().toISOString() });
       }
     });
     atividades = atividades.map(a => a.id === id ? novo : a);
   } else {
     atividades.push(novo);
   }
+
+  if (origemAnteriorId && origemAnteriorId !== origemSelecionadaId) {
+    desvincularAtividades(id, origemAnteriorId);
+  }
+  if (origemSelecionadaId) {
+    vincularAtividades(id, origemSelecionadaId);
+    recalcularSituacaoOficioOrigem(origemSelecionadaId);
+  }
+  if (origemAnteriorId && origemAnteriorId !== origemSelecionadaId) {
+    recalcularSituacaoOficioOrigem(origemAnteriorId);
+  }
+
   save(); renderAll(); fecharModal();
 });
 
